@@ -89,7 +89,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Extract unique ingredients from CSV recipes")
-    parser.add_argument("--csv", type=str, default=str(Path("data/recipes/full_dataset.csv")), help="Path to full_dataset.csv")
+    parser.add_argument("--csv", type=str, default=str(Path("data/recipes/all_recipes_weighted.csv")), help="Path to all_recipes_weighted.csv")
     parser.add_argument("--limit", type=int, default=1000, help="Process only the first N rows")
     parser.add_argument("--output", type=str, default=str(Path("data/ingredients/extracted_ingredients.txt")), help="Output file for ingredients")
     parser.add_argument("--min-count", type=int, default=2, help="Minimum occurrence count to include ingredient")

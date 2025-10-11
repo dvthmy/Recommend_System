@@ -1,0 +1,99 @@
+# 0) Go to project
+cd "D:\_Freelance-Project-Pool\Recommend foods"
+
+# 1) Python venv + deps
+python -m venv .venv
+.\.venv\Scripts\python -m pip install --upgrade pip
+.\.venv\Scripts\pip install -r requirements.txt
+
+# Point PATH to your DBMS bin so cypher-shell.bat is callable
+$env:Path = "C:\Users\ThaoMuy\.Neo4jDesktop2\Data\dbmss\dbms-65bfacb2-4779-4e59-b1df-0434e4ce14f2\bin;$env:Path"
+
+# Quick connectivity check (optional)
+cypher-shell.bat -a bolt://localhost:7687 -u neo4j -p "Admin123!" -d system "SHOW DATABASES;"
+
+# Drop and recreate (safe if it doesn't exist)
+cypher-shell.bat -a bolt://localhost:7687 -u neo4j -p "Admin123!" -d system "DROP DATABASE food IF EXISTS;"
+cypher-shell.bat -a bolt://localhost:7687 -u neo4j -p "Admin123!" -d system "CREATE DATABASE food;"
+cypher-shell.bat -a bolt://localhost:7687 -u neo4j -p "Admin123!" -d system "SHOW DATABASES YIELD name, currentStatus WHERE name='food' RETURN name, currentStatus;"
+
+# Schema (constraints, indexes)
+cypher-shell.bat -a bolt://localhost:7687 -u neo4j -p "Admin123!" -d food --file db/neo4j/schema.cypher
+
+# Ingredients
+cypher-shell.bat -a bolt://localhost:7687 -u neo4j -p "Admin123!" -d food --file db/neo4j/ingredient.cypher
+
+#3) Import recipes (200 mẫu, dùng driver)
+.\.venv\Scripts\python .\scripts\import_recipes_neo4j.py `
+  --neo4j-uri bolt://localhost:7687 `
+  --neo4j-user neo4j `
+  --neo4j-pass "Admin123!" `
+  --db food `
+  --use-driver `
+  --verbose
+
+  python .\scripts\import_users_from_survey.py `
+  --csv "C:\Users\ThaoMuy\Downloads\RS\data\users\users-survey.csv" `
+  --uri bolt://localhost:7687 `
+  --user neo4j `
+  --password "Admin123!" `
+  --db food
+
+
+#Seed 200 users
+cypher-shell.bat -a bolt://localhost:7687 -u neo4j -p "Admin123!" -d food --file db/neo4j/seed_users_simple_200.cypher
+
+#5) Compute features (IDF edges, recipe TF‑IDF, user vectors)
+.\.venv\Scripts\python .\scripts\compute_features.py `
+  --uri bolt://localhost:7687 `
+  --user neo4j `
+  --password "Admin123!" `
+  --db food
+
+.\.venv\Scripts\python .\scripts\recommend.py `
+  --db food `
+  --password "Admin123!" `
+  --ing ing_onion,ing_tomato `
+  --max-cook-time 45 `
+  --limit 5 `
+  --json
+
+
+.\.venv\Scripts\python .\scripts\recommend.py `
+  --db food `
+  --password "Admin123!" `
+  --user-id u_1 `
+  --ing ing_onion,ing_tomato `
+  --max-cook-time 45 `
+  --limit 5 `
+  --w-ing 1.0 `
+  --w-text 1.0 `
+  --w-pop 0.2 `
+  --json
+
+
+.\.venv\Scripts\python .\scripts\recommend.py `
+    --db food `
+  --password "Admin123!" `
+  --user-id u_1 `
+  --ing ing_onion,ing_tomato,ing_salmon,ing_tofu  `
+  --max-cook-time 45 `
+  --limit 5 `
+  --w-ing 1.0 `
+  --w-text 1.0 `
+  --w-pop 0.2 `
+  --json
+
+python scripts\recommend.py `
+  --db food `
+  --password "Admin123!" `
+  --ing ing_onion,ing_tomato,ing_salmon,ing_tofu `
+  --max-cook-time 45 `
+  --limit 10 `
+  --w-ing 1.0 `
+  --w-text 0.0 `
+  --w-pop 1.0 `
+  --w-cf 0.0 `
+  --norm rank `
+  --pop-half-life 60 `
+  --json

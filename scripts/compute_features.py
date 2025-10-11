@@ -36,18 +36,19 @@ def fetch_recipes(tx) -> List[RecipeDoc]:
                coalesce(r.title,'') AS title,
                coalesce(r.tags, []) AS tags,
                coalesce(r.instructions,'') AS instr,
-               coalesce(r.cuisine,'') AS cuisine,
+               coalesce(r.cuisine, []) AS cuisine,
                ingIds AS ing
         """
     )
     rows = tx.run(q)
     out: List[RecipeDoc] = []
     for row in rows:
+        cuisine_str = " ".join(row["cuisine"]) if isinstance(row["cuisine"], list) else str(row["cuisine"] or "")
         text = " ".join([
-            row["title"],
-            " ".join(row["tags"]),
-            row["instr"][:500],
-            row["cuisine"],
+            str(row["title"] or ""),
+            " ".join(row["tags"] or []),
+            str(row["instr"] or "")[:500],
+            cuisine_str,
         ])
         out.append(RecipeDoc(
             recipe_id=row["id"],
@@ -55,6 +56,7 @@ def fetch_recipes(tx) -> List[RecipeDoc]:
             text_tokens=normalize_text(text),
         ))
     return out
+
 
 
 def compute_idf(docs: List[List[str]]) -> Dict[str, float]:
@@ -164,6 +166,55 @@ def aggregate_user_profile(tx):
     tx.run(q)
 
 
+def build_item_item_similarity(tx, min_sim: float = 0.05, max_pairs: int = 2000000):
+    # Build item-item similarities from co-interactions with degree-normalized score
+    # We cap pairs with LIMIT to avoid explosion on dense graphs.
+    # q = (
+    #     """
+    #     // Compute item-item similarity based on user co-interactions
+    #     // Normalization similar to cosine over binary interactions
+    #     MATCH (u:User)-[:INTERACTED_WITH]->(r1:Recipe)
+    #     MATCH (u)-[:INTERACTED_WITH]->(r2:Recipe)
+    #     WHERE r1 <> r2
+    #     WITH r1, r2, count(*) AS c
+    #     WITH r1, r2, toFloat(c) / sqrt(
+    #          size( (r1)<-[:INTERACTED_WITH]-() ) * size( (r2)<-[:INTERACTED_WITH]-() )
+    #     ) AS sim
+    #     WHERE sim >= $minSim
+    #     WITH r1, r2, sim
+    #     // Optional cap to avoid creating too many edges
+    #     LIMIT $maxPairs
+    #     MERGE (r1)-[s:SIMILAR_TO]->(r2)
+    #     SET s.score = sim,
+    #         s.updated_at = datetime()
+    #     RETURN count(s) AS created
+    #     """
+    # )
+    q = (
+        """
+        // Compute item-item similarity based on user co-interactions
+        // Normalization similar to cosine over binary interactions
+        MATCH (u:User)-[:INTERACTED_WITH]->(r1:Recipe)
+        MATCH (u)-[:INTERACTED_WITH]->(r2:Recipe)
+        WHERE r1 <> r2
+        WITH r1, r2, count(*) AS c
+        WITH r1, r2,
+             toFloat(c) / sqrt(
+                 COUNT { (r1)<-[:INTERACTED_WITH]-(:User) } *
+                 COUNT { (r2)<-[:INTERACTED_WITH]-(:User) }
+             ) AS sim
+        WHERE sim >= $minSim
+        WITH r1, r2, sim
+        LIMIT $maxPairs
+        MERGE (r1)-[s:SIMILAR_TO]->(r2)
+        SET s.score = sim,
+            s.updated_at = datetime()
+        RETURN count(s) AS created
+        """
+    )
+    tx.run(q, minSim=min_sim, maxPairs=max_pairs)
+
+
 def main() -> None:
     import argparse
 
@@ -210,6 +261,9 @@ def main() -> None:
 
         # Aggregate user profile vectors (TF-IDF)
         session.write_transaction(aggregate_user_profile)
+        
+        # ✅ Build collaborative filtering graph (item-item similarity)
+        session.write_transaction(build_item_item_similarity)
 
     driver.close()
 
