@@ -1,0 +1,23 @@
+Tổng số node
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "MATCH (n) RETURN count(n) AS nodes;" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+Tổng số relationship
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "MATCH ()-[r]->() RETURN count(r) AS relationships;" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+Số lượng label (đếm các label hiện có)
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "CALL db.labels() YIELD label RETURN count(*) AS label_count;" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+Số loại relationship (relationship types)
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "CALL db.relationshipTypes() YIELD relationshipType RETURN count(*) AS rel_type_count;" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+Gộp chung 1 lệnh trả về: tổng node, tổng relationship, số label, số loại relationship
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "CALL { MATCH (n) RETURN count(n) AS nodes } CALL { MATCH ()-[r]->() RETURN count(r) AS rels } CALL { CALL db.labels() YIELD label RETURN count(*) AS label_count } CALL { CALL db.relationshipTypes() YIELD relationshipType RETURN count(*) AS rel_type_count } RETURN nodes, rels, label_count, rel_type_count;" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+Nếu có APOC và muốn xem chi tiết theo label:
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "CALL apoc.meta.stats() YIELD labels, relTypesCount RETURN labels, relTypesCount;" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+Nếu muốn liệt kê số node theo từng label (cần APOC):
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "CALL apoc.meta.stats() YIELD labels UNWIND keys(labels) AS label RETURN label, labels[label] AS node_count ORDER BY node_count DESC;" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+Nếu muốn dung lượng dữ liệu trên đĩa (Neo4j 5.x):
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "CALL db.size.onDisk.bytes() YIELD total RETURN total AS bytes_on_disk;" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+Trên Neo4j 4.x (không có proc size.onDisk), bạn có thể xem nhanh bằng APOC:
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "CALL apoc.meta.stats()" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+Hoặc gộp đếm node/rel cơ bản:
+cd "C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin"; echo "MATCH (n) WITH count(n) AS nodes MATCH ()-[r]->() WITH nodes, count(r) AS rels CALL db.labels() YIELD label WITH nodes, rels, count(label) AS label_count CALL db.relationshipTypes() YIELD relationshipType WITH nodes, rels, label_count, count(relationshipType) AS rel_type_count RETURN nodes, rels, label_count, rel_type_count;" | cypher-shell -u neo4j -p "Admin123!" -a bolt://localhost:7687 -d food
+
+cd C:\Users\PC\.Neo4jDesktop2\Data\dbmss\dbms-26de69ac-01ff-49da-afbf-42ec77bbe71b\bin>
+neo4j console
