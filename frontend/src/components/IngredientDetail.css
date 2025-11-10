@@ -1,0 +1,281 @@
+.ingredient-detail-container {
+  min-height: 100vh;
+  background: var(--background-color);
+  padding: 2rem 0;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: 2rem;
+  padding: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color 0.2s ease;
+}
+
+.back-button:hover {
+  color: var(--primary-dark);
+}
+
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.ingredient-detail {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.detail-header {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 2rem;
+  padding: 2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ingredient-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ingredient-placeholder {
+  width: 150px;
+  height: 150px;
+  background: var(--background-light);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--border-color);
+}
+
+.ingredient-icon {
+  font-size: 4rem;
+}
+
+.ingredient-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ingredient-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.category-badge {
+  background: var(--primary-color);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.allergen-badge {
+  background: var(--color-warning);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.ingredient-info h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.alternative-name {
+  color: var(--text-secondary);
+  font-style: italic;
+  margin: 0;
+}
+
+.ingredient-description {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.ingredient-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.meta-item {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.meta-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 100px;
+}
+
+.meta-value {
+  color: var(--text-secondary);
+}
+
+.meta-value.warning {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.detail-content {
+  padding: 2rem;
+}
+
+.content-grid {
+  display: grid;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.alternative-names-section,
+.nutrition-section {
+  background: var(--background-light);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.alternative-names-section h2,
+.nutrition-section h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.alternative-names-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.alternative-name-tag {
+  background: white;
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  font-size: 0.875rem;
+}
+
+.nutrition-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.nutrition-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.nutrition-label {
+  font-weight: 500;
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.nutrition-value {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.allergen-warning {
+  background: #fef3cd;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+.allergen-warning h3 {
+  color: #92400e;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.125rem;
+}
+
+.allergen-warning p {
+  color: #92400e;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .detail-header {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    text-align: center;
+  }
+
+  .ingredient-placeholder {
+    width: 120px;
+    height: 120px;
+  }
+
+  .ingredient-icon {
+    font-size: 3rem;
+  }
+
+  .ingredient-info h1 {
+    font-size: 2rem;
+  }
+
+  .nutrition-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .meta-item {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .meta-label {
+    min-width: auto;
+  }
+}

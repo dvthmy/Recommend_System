@@ -1,0 +1,2745 @@
+[
+  {
+    "id": "ing_pepper",
+    "canonical": "pepper",
+    "category": "vegetable",
+    "alt": [
+      "peppers"
+    ]
+  },
+  {
+    "id": "ing_salt",
+    "canonical": "salt",
+    "category": "seasoning",
+    "alt": [
+      "salts"
+    ]
+  },
+  {
+    "id": "ing_oil",
+    "canonical": "oil",
+    "category": "condiment",
+    "alt": [
+      "oils"
+    ]
+  },
+  {
+    "id": "ing_cheese",
+    "canonical": "cheese",
+    "category": "dairy",
+    "alt": [
+      "cheeses"
+    ]
+  },
+  {
+    "id": "ing_onion",
+    "canonical": "onion",
+    "category": "vegetable",
+    "alt": [
+      "onions"
+    ]
+  },
+  {
+    "id": "ing_garlic",
+    "canonical": "garlic",
+    "category": "vegetable",
+    "alt": [
+      "garlics"
+    ]
+  },
+  {
+    "id": "ing_sauce",
+    "canonical": "sauce",
+    "category": "sauce",
+    "alt": [
+      "sauces"
+    ]
+  },
+  {
+    "id": "ing_butter",
+    "canonical": "butter",
+    "category": "dairy",
+    "alt": [
+      "butters"
+    ]
+  },
+  {
+    "id": "ing_water",
+    "canonical": "water",
+    "category": "beverage",
+    "alt": [
+      "waters"
+    ]
+  },
+  {
+    "id": "ing_cream",
+    "canonical": "cream",
+    "category": "dairy",
+    "alt": [
+      "creams"
+    ]
+  },
+  {
+    "id": "ing_vinegar",
+    "canonical": "vinegar",
+    "category": "sauce",
+    "alt": [
+      "vinegars"
+    ]
+  },
+  {
+    "id": "ing_broth",
+    "canonical": "broth",
+    "category": "condiment",
+    "alt": [
+      "broths"
+    ]
+  },
+  {
+    "id": "ing_flour",
+    "canonical": "flour",
+    "category": "grain",
+    "alt": [
+      "flours"
+    ]
+  },
+  {
+    "id": "ing_juice",
+    "canonical": "juice",
+    "category": "beverage",
+    "alt": [
+      "juices"
+    ]
+  },
+  {
+    "id": "ing_egg",
+    "canonical": "egg",
+    "category": "baking",
+    "alt": [
+      "eggs"
+    ]
+  },
+  {
+    "id": "ing_parsley",
+    "canonical": "parsley",
+    "category": "herb",
+    "alt": [
+      "parsleies"
+    ]
+  },
+  {
+    "id": "ing_tomato",
+    "canonical": "tomato",
+    "category": "vegetable",
+    "alt": [
+      "tomatoes"
+    ]
+  },
+  {
+    "id": "ing_mustard",
+    "canonical": "mustard",
+    "category": "condiment",
+    "alt": [
+      "mustards"
+    ]
+  },
+  {
+    "id": "ing_sugar",
+    "canonical": "sugar",
+    "category": "seasoning",
+    "alt": [
+      "sugars"
+    ]
+  },
+  {
+    "id": "ing_milk",
+    "canonical": "milk",
+    "category": "dairy",
+    "alt": [
+      "milks"
+    ]
+  },
+  {
+    "id": "ing_paprika",
+    "canonical": "paprika",
+    "category": "seasoning",
+    "alt": [
+      "paprikas"
+    ]
+  },
+  {
+    "id": "ing_oregano",
+    "canonical": "oregano",
+    "category": "herb",
+    "alt": [
+      "oreganos"
+    ]
+  },
+  {
+    "id": "ing_mayonnaise",
+    "canonical": "mayonnaise",
+    "category": "condiment",
+    "alt": [
+      "mayonnaises"
+    ]
+  },
+  {
+    "id": "ing_bean",
+    "canonical": "bean",
+    "category": "plant_protein",
+    "alt": [
+      "beans"
+    ]
+  },
+  {
+    "id": "ing_lemon",
+    "canonical": "lemon",
+    "category": "fruit",
+    "alt": [
+      "lemons"
+    ]
+  },
+  {
+    "id": "ing_cilantro",
+    "canonical": "cilantro",
+    "category": "herb",
+    "alt": [
+      "cilantros"
+    ]
+  },
+  {
+    "id": "ing_breast",
+    "canonical": "breast",
+    "category": "meat",
+    "alt": [
+      "breasts"
+    ]
+  },
+  {
+    "id": "ing_honey",
+    "canonical": "honey",
+    "category": "sweetener",
+    "alt": [
+      "honeies"
+    ]
+  },
+  {
+    "id": "ing_rice",
+    "canonical": "rice",
+    "category": "grain",
+    "alt": [
+      "rices"
+    ]
+  },
+  {
+    "id": "ing_bacon",
+    "canonical": "bacon",
+    "category": "meat",
+    "alt": [
+      "bacons"
+    ]
+  },
+  {
+    "id": "ing_beef",
+    "canonical": "beef",
+    "category": "meat",
+    "alt": [
+      "beefs"
+    ]
+  },
+  {
+    "id": "ing_potato",
+    "canonical": "potato",
+    "category": "vegetable",
+    "alt": [
+      "potatoes"
+    ]
+  },
+  {
+    "id": "ing_chili",
+    "canonical": "chili",
+    "category": "seasoning",
+    "alt": [
+      "chilli",
+      "chile"
+    ]
+  },
+  {
+    "id": "ing_ginger",
+    "canonical": "ginger",
+    "category": "seasoning",
+    "alt": [
+      "gingers"
+    ]
+  },
+  {
+    "id": "ing_cumin",
+    "canonical": "cumin",
+    "category": "seasoning",
+    "alt": [
+      "cumins"
+    ]
+  },
+  {
+    "id": "ing_chicken",
+    "canonical": "chicken",
+    "category": "meat",
+    "alt": [
+      "chickens"
+    ]
+  },
+  {
+    "id": "ing_carrot",
+    "canonical": "carrot",
+    "category": "vegetable",
+    "alt": [
+      "carrots"
+    ]
+  },
+  {
+    "id": "ing_pasta",
+    "canonical": "pasta",
+    "category": "grain",
+    "alt": [
+      "pastas"
+    ]
+  },
+  {
+    "id": "ing_shallot",
+    "canonical": "shallot",
+    "category": "vegetable",
+    "alt": [
+      "shallots"
+    ]
+  },
+  {
+    "id": "ing_skinless",
+    "canonical": "skinless",
+    "category": "other",
+    "alt": []
+  },
+  {
+    "id": "ing_thigh",
+    "canonical": "thigh",
+    "category": "meat",
+    "alt": [
+      "thighs"
+    ]
+  },
+  {
+    "id": "ing_cornstarch",
+    "canonical": "cornstarch",
+    "category": "grain",
+    "alt": [
+      "cornstarches"
+    ]
+  },
+  {
+    "id": "ing_thyme",
+    "canonical": "thyme",
+    "category": "herb",
+    "alt": [
+      "thymes"
+    ]
+  },
+  {
+    "id": "ing_egg",
+    "canonical": "egg",
+    "category": "baking",
+    "alt": [
+      "eggs"
+    ]
+  },
+  {
+    "id": "ing_wine",
+    "canonical": "wine",
+    "category": "beverage",
+    "alt": [
+      "wines"
+    ]
+  },
+  {
+    "id": "ing_basil",
+    "canonical": "basil",
+    "category": "herb",
+    "alt": [
+      "basils"
+    ]
+  },
+  {
+    "id": "ing_mushroom",
+    "canonical": "mushroom",
+    "category": "vegetable",
+    "alt": [
+      "mushrooms"
+    ]
+  },
+  {
+    "id": "ing_crumbs",
+    "canonical": "crumbs",
+    "category": "other",
+    "alt": []
+  },
+  {
+    "id": "ing_tortilla",
+    "canonical": "tortilla",
+    "category": "grain",
+    "alt": [
+      "tortillas"
+    ]
+  },
+  {
+    "id": "ing_spinach",
+    "canonical": "spinach",
+    "category": "vegetable",
+    "alt": [
+      "spinaches"
+    ]
+  },
+  {
+    "id": "ing_celery",
+    "canonical": "celery",
+    "category": "vegetable",
+    "alt": [
+      "celeries"
+    ]
+  },
+  {
+    "id": "ing_breadcrumb",
+    "canonical": "breadcrumb",
+    "category": "grain",
+    "alt": [
+      "breadcrumbs, bread crumbs"
+    ]
+  },
+  {
+    "id": "ing_stock",
+    "canonical": "stock",
+    "category": "condiment",
+    "alt": [
+      "stocks"
+    ]
+  },
+  {
+    "id": "ing_ketchup",
+    "canonical": "ketchup",
+    "category": "condiment",
+    "alt": [
+      "ketchups"
+    ]
+  },
+  {
+    "id": "ing_noodle",
+    "canonical": "noodle",
+    "category": "grain",
+    "alt": [
+      "noodles"
+    ]
+  },
+  {
+    "id": "ing_ham",
+    "canonical": "ham",
+    "category": "meat",
+    "alt": [
+      "hams"
+    ]
+  },
+  {
+    "id": "ing_corn",
+    "canonical": "corn",
+    "category": "grain",
+    "alt": [
+      "corns"
+    ]
+  },
+  {
+    "id": "ing_sausage",
+    "canonical": "sausage",
+    "category": "meat",
+    "alt": [
+      "sausages"
+    ]
+  },
+  {
+    "id": "ing_dill",
+    "canonical": "dill",
+    "category": "herb",
+    "alt": [
+      "dills"
+    ]
+  },
+  {
+    "id": "ing_cayenne",
+    "canonical": "cayenne",
+    "category": "seasoning",
+    "alt": [
+      "cayennes"
+    ]
+  },
+  {
+    "id": "ing_lettuce",
+    "canonical": "lettuce",
+    "category": "vegetable",
+    "alt": [
+      "lettuces"
+    ]
+  },
+  {
+    "id": "ing_pea",
+    "canonical": "pea",
+    "category": "vegetable",
+    "alt": [
+      "peas"
+    ]
+  },
+  {
+    "id": "ing_olive",
+    "canonical": "olive",
+    "category": "condiment",
+    "alt": [
+      "olives"
+    ]
+  },
+  {
+    "id": "ing_chive",
+    "canonical": "chive",
+    "category": "vegetable",
+    "alt": [
+      "chives"
+    ]
+  },
+  {
+    "id": "ing_bread",
+    "canonical": "bread",
+    "category": "grain",
+    "alt": [
+      "breads"
+    ]
+  },
+  {
+    "id": "ing_scallion",
+    "canonical": "scallion",
+    "category": "vegetable",
+    "alt": [
+      "scallions"
+    ]
+  },
+  {
+    "id": "ing_zucchini",
+    "canonical": "zucchini",
+    "category": "vegetable",
+    "alt": [
+      "zucchinis"
+    ]
+  },
+  {
+    "id": "ing_cabbage",
+    "canonical": "cabbage",
+    "category": "vegetable",
+    "alt": [
+      "cabbages"
+    ]
+  },
+  {
+    "id": "ing_jalapeno",
+    "canonical": "jalapeno",
+    "category": "seasoning",
+    "alt": [
+      "jalapenos"
+    ]
+  },
+  {
+    "id": "ing_soup",
+    "canonical": "soup",
+    "category": "condiment",
+    "alt": [
+      "soups"
+    ]
+  },
+  {
+    "id": "ing_lime",
+    "canonical": "lime",
+    "category": "fruit",
+    "alt": [
+      "limes"
+    ]
+  },
+  {
+    "id": "ing_shrimp",
+    "canonical": "shrimp",
+    "category": "seafood",
+    "alt": [
+      "prawn"
+    ]
+  },
+  {
+    "id": "ing_bun",
+    "canonical": "bun",
+    "category": "other",
+    "alt": [
+      "buns"
+    ]
+  },
+  {
+    "id": "ing_cucumber",
+    "canonical": "cucumber",
+    "category": "vegetable",
+    "alt": [
+      "cucumbers"
+    ]
+  },
+  {
+    "id": "ing_steak",
+    "canonical": "steak",
+    "category": "meat",
+    "alt": [
+      "steaks"
+    ]
+  },
+  {
+    "id": "ing_syrup",
+    "canonical": "syrup",
+    "category": "sweetener",
+    "alt": [
+      "syrups"
+    ]
+  },
+  {
+    "id": "ing_roll",
+    "canonical": "roll",
+    "category": "grain",
+    "alt": [
+      "rolls"
+    ]
+  },
+  {
+    "id": "ing_avocado",
+    "canonical": "avocado",
+    "category": "vegetable",
+    "alt": [
+      "avocados"
+    ]
+  },
+  {
+    "id": "ing_buttermilk",
+    "canonical": "buttermilk",
+    "category": "dairy",
+    "alt": [
+      "buttermilks"
+    ]
+  },
+  {
+    "id": "ing_cinnamon",
+    "canonical": "cinnamon",
+    "category": "seasoning",
+    "alt": [
+      "cinnamons"
+    ]
+  },
+  {
+    "id": "ing_yogurt",
+    "canonical": "yogurt",
+    "category": "dairy",
+    "alt": [
+      "yoghurt"
+    ]
+  },
+  {
+    "id": "ing_rosemary",
+    "canonical": "rosemary",
+    "category": "herb",
+    "alt": [
+      "rosemaries"
+    ]
+  },
+  {
+    "id": "ing_pork",
+    "canonical": "pork",
+    "category": "meat",
+    "alt": [
+      "porks"
+    ]
+  },
+  {
+    "id": "ing_asparagus",
+    "canonical": "asparagus",
+    "category": "vegetable",
+    "alt": []
+  },
+  {
+    "id": "ing_turmeric",
+    "canonical": "turmeric",
+    "category": "seasoning",
+    "alt": [
+      "turmerics"
+    ]
+  },
+  {
+    "id": "ing_herb",
+    "canonical": "herb",
+    "category": "seasoning",
+    "alt": [
+      "herbs"
+    ]
+  },
+  {
+    "id": "ing_spaghetti",
+    "canonical": "spaghetti",
+    "category": "grain",
+    "alt": [
+      "spaghettis"
+    ]
+  },
+  {
+    "id": "ing_chili",
+    "canonical": "chili",
+    "category": "seasoning",
+    "alt": [
+      "chilli",
+      "chile"
+    ]
+  },
+  {
+    "id": "ing_pepperoni",
+    "canonical": "pepperoni",
+    "category": "meat",
+    "alt": [
+      "pepperonis"
+    ]
+  },
+  {
+    "id": "ing_caper",
+    "canonical": "caper",
+    "category": "vegetable",
+    "alt": [
+      "capers"
+    ]
+  },
+  {
+    "id": "ing_fillet",
+    "canonical": "fillet",
+    "category": "seafood",
+    "alt": [
+      "fillets"
+    ]
+  },
+  {
+    "id": "ing_coriander",
+    "canonical": "coriander",
+    "category": "seasoning",
+    "alt": [
+      "cilantro"
+    ]
+  },
+  {
+    "id": "ing_dough",
+    "canonical": "dough",
+    "category": "grain",
+    "alt": [
+      "doughs"
+    ]
+  },
+  {
+    "id": "ing_sriracha",
+    "canonical": "sriracha",
+    "category": "condiment",
+    "alt": [
+      "srirachas"
+    ]
+  },
+  {
+    "id": "ing_mint",
+    "canonical": "mint",
+    "category": "herb",
+    "alt": [
+      "mints"
+    ]
+  },
+  {
+    "id": "ing_clove",
+    "canonical": "clove",
+    "category": "seasoning",
+    "alt": [
+      "cloves"
+    ]
+  },
+  {
+    "id": "ing_pesto",
+    "canonical": "pesto",
+    "category": "condiment",
+    "alt": [
+      "pestos"
+    ]
+  },
+  {
+    "id": "ing_squash",
+    "canonical": "squash",
+    "category": "vegetable",
+    "alt": [
+      "squashes"
+    ]
+  },
+  {
+    "id": "ing_turkey",
+    "canonical": "turkey",
+    "category": "meat",
+    "alt": [
+      "turkeies"
+    ]
+  },
+  {
+    "id": "ing_tenderloin",
+    "canonical": "tenderloin",
+    "category": "meat",
+    "alt": [
+      "tenderloins"
+    ]
+  },
+  {
+    "id": "ing_nutmeg",
+    "canonical": "nutmeg",
+    "category": "seasoning",
+    "alt": [
+      "nutmegs"
+    ]
+  },
+  {
+    "id": "ing_salsa",
+    "canonical": "salsa",
+    "category": "condiment",
+    "alt": [
+      "salsas"
+    ]
+  },
+  {
+    "id": "ing_cauliflower",
+    "canonical": "cauliflower",
+    "category": "vegetable",
+    "alt": [
+      "cauliflowers"
+    ]
+  },
+  {
+    "id": "ing_bouillon",
+    "canonical": "bouillon",
+    "category": "condiment",
+    "alt": [
+      "bouillons"
+    ]
+  },
+  {
+    "id": "ing_mozzarella",
+    "canonical": "mozzarella",
+    "category": "dairy",
+    "alt": [
+      "mozzarellas"
+    ]
+  },
+  {
+    "id": "ing_meat",
+    "canonical": "meat",
+    "category": "other",
+    "alt": [
+      "meats"
+    ]
+  },
+  {
+    "id": "ing_pickle",
+    "canonical": "pickle",
+    "category": "condiment",
+    "alt": [
+      "pickles"
+    ]
+  },
+  {
+    "id": "ing_cornmeal",
+    "canonical": "cornmeal",
+    "category": "grain",
+    "alt": [
+      "cornmeals"
+    ]
+  },
+  {
+    "id": "ing_broccoli",
+    "canonical": "broccoli",
+    "category": "vegetable",
+    "alt": [
+      "broccolis"
+    ]
+  },
+  {
+    "id": "ing_curry",
+    "canonical": "curry",
+    "category": "seasoning",
+    "alt": [
+      "curries"
+    ]
+  },
+  {
+    "id": "ing_orzo",
+    "canonical": "orzo",
+    "category": "grain",
+    "alt": [
+      "orzos"
+    ]
+  },
+  {
+    "id": "ing_almond",
+    "canonical": "almond",
+    "category": "nut_or_seed",
+    "alt": [
+      "almonds"
+    ]
+  },
+  {
+    "id": "ing_cutlet",
+    "canonical": "cutlet",
+    "category": "meat",
+    "alt": [
+      "cutlets"
+    ]
+  },
+  {
+    "id": "ing_prosciutto",
+    "canonical": "prosciutto",
+    "category": "meat",
+    "alt": [
+      "prosciuttos"
+    ]
+  },
+  {
+    "id": "ing_relish",
+    "canonical": "relish",
+    "category": "condiment",
+    "alt": [
+      "relishes"
+    ]
+  },
+  {
+    "id": "ing_tarragon",
+    "canonical": "tarragon",
+    "category": "herb",
+    "alt": [
+      "tarragons"
+    ]
+  },
+  {
+    "id": "ing_apple",
+    "canonical": "apple",
+    "category": "fruit",
+    "alt": [
+      "apples"
+    ]
+  },
+  {
+    "id": "ing_yolk",
+    "canonical": "yolk",
+    "category": "baking",
+    "alt": [
+      "yolks"
+    ]
+  },
+  {
+    "id": "ing_cracker",
+    "canonical": "cracker",
+    "category": "grain",
+    "alt": [
+      "crackers"
+    ]
+  },
+  {
+    "id": "ing_macaroni",
+    "canonical": "macaroni",
+    "category": "grain",
+    "alt": [
+      "macaronis"
+    ]
+  },
+  {
+    "id": "ing_lime",
+    "canonical": "lime",
+    "category": "fruit",
+    "alt": [
+      "limes"
+    ]
+  },
+  {
+    "id": "ing_cereal",
+    "canonical": "cereal",
+    "category": "grain",
+    "alt": [
+      "cereals"
+    ]
+  },
+  {
+    "id": "ing_gnocchi",
+    "canonical": "gnocchi",
+    "category": "grain",
+    "alt": [
+      "gnocchis"
+    ]
+  },
+  {
+    "id": "ing_peanut",
+    "canonical": "peanut",
+    "category": "nut_or_seed",
+    "alt": [
+      "peanuts"
+    ]
+  },
+  {
+    "id": "ing_spice",
+    "canonical": "spice",
+    "category": "seasoning",
+    "alt": [
+      "spices"
+    ]
+  },
+  {
+    "id": "ing_feta",
+    "canonical": "feta",
+    "category": "dairy",
+    "alt": [
+      "fetas"
+    ]
+  },
+  {
+    "id": "ing_meatball",
+    "canonical": "meatball",
+    "category": "meat",
+    "alt": [
+      "meatballs"
+    ]
+  },
+  {
+    "id": "ing_pineapple",
+    "canonical": "pineapple",
+    "category": "fruit",
+    "alt": [
+      "pineapples"
+    ]
+  },
+  {
+    "id": "ing_crust",
+    "canonical": "crust",
+    "category": "grain",
+    "alt": [
+      "crusts"
+    ]
+  },
+  {
+    "id": "ing_nut",
+    "canonical": "nut",
+    "category": "nut_or_seed",
+    "alt": [
+      "nuts"
+    ]
+  },
+  {
+    "id": "ing_corn_kernel",
+    "canonical": "corn kernel",
+    "category": "grain",
+    "alt": [
+      "corn kernels"
+    ]
+  },
+  {
+    "id": "ing_sirloin",
+    "canonical": "sirloin",
+    "category": "meat",
+    "alt": [
+      "sirloins"
+    ]
+  },
+  {
+    "id": "ing_radish",
+    "canonical": "radish",
+    "category": "vegetable",
+    "alt": [
+      "radishes"
+    ]
+  },
+  {
+    "id": "ing_tender",
+    "canonical": "tender",
+    "category": "meat",
+    "alt": [
+      "tenders"
+    ]
+  },
+  {
+    "id": "ing_cider",
+    "canonical": "cider",
+    "category": "beverage",
+    "alt": [
+      "ciders"
+    ]
+  },
+  {
+    "id": "ing_walnut",
+    "canonical": "walnut",
+    "category": "nut_or_seed",
+    "alt": [
+      "walnuts"
+    ]
+  },
+  {
+    "id": "ing_crouton",
+    "canonical": "crouton",
+    "category": "grain",
+    "alt": [
+      "croutons"
+    ]
+  },
+  {
+    "id": "ing_salami",
+    "canonical": "salami",
+    "category": "meat",
+    "alt": [
+      "salamis"
+    ]
+  },
+  {
+    "id": "ing_glaze",
+    "canonical": "glaze",
+    "category": "condiment",
+    "alt": [
+      "glazes"
+    ]
+  },
+  {
+    "id": "ing_ricotta",
+    "canonical": "ricotta",
+    "category": "dairy",
+    "alt": [
+      "ricottas"
+    ]
+  },
+  {
+    "id": "ing_peppercorn",
+    "canonical": "peppercorn",
+    "category": "seasoning",
+    "alt": [
+      "peppercorns"
+    ]
+  },
+  {
+    "id": "ing_redhot",
+    "canonical": "redhot",
+    "category": "seasoning",
+    "alt": [
+      "redhots"
+    ]
+  },
+  {
+    "id": "ing_beer",
+    "canonical": "beer",
+    "category": "beverage",
+    "alt": [
+      "beers"
+    ]
+  },
+  {
+    "id": "ing_arugula",
+    "canonical": "arugula",
+    "category": "vegetable",
+    "alt": [
+      "arugulas"
+    ]
+  },
+  {
+    "id": "ing_eggplant",
+    "canonical": "eggplant",
+    "category": "vegetable",
+    "alt": [
+      "aubergine"
+    ]
+  },
+  {
+    "id": "ing_quinoa",
+    "canonical": "quinoa",
+    "category": "grain",
+    "alt": [
+      "quinoas"
+    ]
+  },
+  {
+    "id": "ing_apple",
+    "canonical": "apple",
+    "category": "fruit",
+    "alt": [
+      "apples"
+    ]
+  },
+  {
+    "id": "ing_crema",
+    "canonical": "crema",
+    "category": "condiment",
+    "alt": [
+      "cremas"
+    ]
+  },
+  {
+    "id": "ing_tabasco",
+    "canonical": "tabasco",
+    "category": "condiment",
+    "alt": [
+      "tabascos"
+    ]
+  },
+  {
+    "id": "ing_mirin",
+    "canonical": "mirin",
+    "category": "condiment",
+    "alt": [
+      "mirins"
+    ]
+  },
+  {
+    "id": "ing_shoulder",
+    "canonical": "shoulder",
+    "category": "other",
+    "alt": [
+      "shoulders"
+    ]
+  },
+  {
+    "id": "ing_gochujang",
+    "canonical": "gochujang",
+    "category": "condiment",
+    "alt": [
+      "gochujangs"
+    ]
+  },
+  {
+    "id": "ing_grigio",
+    "canonical": "grigio",
+    "category": "beverage",
+    "alt": [
+      "grigios"
+    ]
+  },
+  {
+    "id": "ing_parmesan",
+    "canonical": "parmesan",
+    "category": "dairy",
+    "alt": [
+      "parmesans"
+    ]
+  },
+  {
+    "id": "ing_sake",
+    "canonical": "sake",
+    "category": "beverage",
+    "alt": [
+      "sakes"
+    ]
+  },
+  {
+    "id": "ing_orange",
+    "canonical": "orange",
+    "category": "fruit",
+    "alt": [
+      "oranges"
+    ]
+  },
+  {
+    "id": "ing_cheddar",
+    "canonical": "cheddar",
+    "category": "dairy",
+    "alt": [
+      "cheddars"
+    ]
+  },
+  {
+    "id": "ing_yeast",
+    "canonical": "yeast",
+    "category": "baking",
+    "alt": [
+      "yeasts"
+    ]
+  },
+  {
+    "id": "ing_pistachio",
+    "canonical": "pistachio",
+    "category": "nut_or_seed",
+    "alt": [
+      "pistachios"
+    ]
+  },
+  {
+    "id": "ing_tortellini",
+    "canonical": "tortellini",
+    "category": "grain",
+    "alt": [
+      "tortellinis"
+    ]
+  },
+  {
+    "id": "ing_ravioli",
+    "canonical": "ravioli",
+    "category": "grain",
+    "alt": [
+      "raviolis"
+    ]
+  },
+  {
+    "id": "ing_raisin",
+    "canonical": "raisin",
+    "category": "fruit",
+    "alt": [
+      "raisins"
+    ]
+  },
+  {
+    "id": "ing_peach",
+    "canonical": "peach",
+    "category": "fruit",
+    "alt": [
+      "peaches"
+    ]
+  },
+  {
+    "id": "ing_leek",
+    "canonical": "leek",
+    "category": "vegetable",
+    "alt": [
+      "leeks"
+    ]
+  },
+  {
+    "id": "ing_pancetta",
+    "canonical": "pancetta",
+    "category": "meat",
+    "alt": [
+      "pancettas"
+    ]
+  },
+  {
+    "id": "ing_bay",
+    "canonical": "bay",
+    "category": "vegetable",
+    "alt": [
+      "baies"
+    ]
+  },
+  {
+    "id": "ing_cranberry",
+    "canonical": "cranberry",
+    "category": "fruit",
+    "alt": [
+      "cranberries"
+    ]
+  },
+  {
+    "id": "ing_panko",
+    "canonical": "panko",
+    "category": "other",
+    "alt": [
+      "pankos"
+    ]
+  },
+  {
+    "id": "ing_fettuccine",
+    "canonical": "fettuccine",
+    "category": "grain",
+    "alt": [
+      "fettuccines"
+    ]
+  },
+  {
+    "id": "ing_reggiano",
+    "canonical": "reggiano",
+    "category": "dairy",
+    "alt": [
+      "reggianos"
+    ]
+  },
+  {
+    "id": "ing_sage",
+    "canonical": "sage",
+    "category": "herb",
+    "alt": [
+      "sages"
+    ]
+  },
+  {
+    "id": "ing_masala",
+    "canonical": "masala",
+    "category": "seasoning",
+    "alt": [
+      "masalas"
+    ]
+  },
+  {
+    "id": "ing_pastry",
+    "canonical": "pastry",
+    "category": "grain",
+    "alt": [
+      "pastries"
+    ]
+  },
+  {
+    "id": "ing_chipotle",
+    "canonical": "chipotle",
+    "category": "seasoning",
+    "alt": [
+      "chipotles"
+    ]
+  },
+  {
+    "id": "ing_salmon",
+    "canonical": "salmon",
+    "category": "seafood",
+    "alt": [
+      "salmons"
+    ]
+  },
+  {
+    "id": "ing_kale",
+    "canonical": "kale",
+    "category": "vegetable",
+    "alt": [
+      "kales"
+    ]
+  },
+  {
+    "id": "ing_tuna",
+    "canonical": "tuna",
+    "category": "seafood",
+    "alt": [
+      "tunas"
+    ]
+  },
+  {
+    "id": "ing_polenta",
+    "canonical": "polenta",
+    "category": "grain",
+    "alt": [
+      "polentas"
+    ]
+  },
+  {
+    "id": "ing_bourbon",
+    "canonical": "bourbon",
+    "category": "beverage",
+    "alt": [
+      "bourbons"
+    ]
+  },
+  {
+    "id": "ing_worcestershire",
+    "canonical": "worcestershire",
+    "category": "condiment",
+    "alt": [
+      "worcestershires"
+    ]
+  },
+  {
+    "id": "ing_allspice",
+    "canonical": "allspice",
+    "category": "seasoning",
+    "alt": [
+      "allspices"
+    ]
+  },
+  {
+    "id": "ing_mango",
+    "canonical": "mango",
+    "category": "fruit",
+    "alt": [
+      "mangos"
+    ]
+  },
+  {
+    "id": "ing_chile",
+    "canonical": "chile",
+    "category": "seasoning",
+    "alt": [
+      "chiles"
+    ]
+  },
+  {
+    "id": "ing_grain",
+    "canonical": "grain",
+    "category": "grain",
+    "alt": [
+      "grains"
+    ]
+  },
+  {
+    "id": "ing_marjoram",
+    "canonical": "marjoram",
+    "category": "herb",
+    "alt": [
+      "marjorams"
+    ]
+  },
+  {
+    "id": "ing_horseradish",
+    "canonical": "horseradish",
+    "category": "condiment",
+    "alt": [
+      "horseradishes"
+    ]
+  },
+  {
+    "id": "ing_boursin",
+    "canonical": "boursin",
+    "category": "dairy",
+    "alt": [
+      "boursins"
+    ]
+  },
+  {
+    "id": "ing_choy",
+    "canonical": "choy",
+    "category": "vegetable",
+    "alt": [
+      "choies"
+    ]
+  },
+  {
+    "id": "ing_tofu",
+    "canonical": "tofu",
+    "category": "plant_protein",
+    "alt": [
+      "tofus"
+    ]
+  },
+  {
+    "id": "ing_kraft",
+    "canonical": "kraft",
+    "category": "condiment",
+    "alt": [
+      "krafts"
+    ]
+  },
+  {
+    "id": "ing_sherry",
+    "canonical": "sherry",
+    "category": "sauce",
+    "alt": [
+      "sherries"
+    ]
+  },
+  {
+    "id": "ing_chickpea",
+    "canonical": "chickpea",
+    "category": "plant_protein",
+    "alt": [
+      "chickpeas"
+    ]
+  },
+  {
+    "id": "ing_mayo",
+    "canonical": "mayo",
+    "category": "other",
+    "alt": [
+      "mayos"
+    ]
+  },
+  {
+    "id": "ing_bagel",
+    "canonical": "bagel",
+    "category": "grain",
+    "alt": [
+      "bagels"
+    ]
+  },
+  {
+    "id": "ing_hot_dog",
+    "canonical": "hot dog",
+    "category": "other",
+    "alt": [
+      "hotdog",
+      "hotdogs","hot dogs"
+    ]
+  },
+  {
+    "id": "ing_cashew",
+    "canonical": "cashew",
+    "category": "nut_or_seed",
+    "alt": [
+      "cashews"
+    ]
+  },
+  {
+    "id": "ing_flatbread",
+    "canonical": "flatbread",
+    "category": "grain",
+    "alt": [
+      "flatbreads"
+    ]
+  },
+  {
+    "id": "ing_lentil",
+    "canonical": "lentil",
+    "category": "plant_protein",
+    "alt": [
+      "lentils"
+    ]
+  },
+  {
+    "id": "ing_apricot",
+    "canonical": "apricot",
+    "category": "fruit",
+    "alt": [
+      "apricots"
+    ]
+  },
+  {
+    "id": "ing_muffin",
+    "canonical": "muffin",
+    "category": "baking",
+    "alt": [
+      "muffins"
+    ]
+  },
+  {
+    "id": "ing_whiskey",
+    "canonical": "whiskey",
+    "category": "beverage",
+    "alt": [
+      "whiskeies"
+    ]
+  },
+  {
+    "id": "ing_pecan",
+    "canonical": "pecan",
+    "category": "nut_or_seed",
+    "alt": [
+      "pecans"
+    ]
+  },
+  {
+    "id": "ing_fraiche",
+    "canonical": "fraiche",
+    "category": "dairy",
+    "alt": [
+      "fraiches"
+    ]
+  },
+  {
+    "id": "ing_applesauce",
+    "canonical": "applesauce",
+    "category": "fruit",
+    "alt": [
+      "applesauces"
+    ]
+  },
+  {
+    "id": "ing_ritz",
+    "canonical": "ritz",
+    "category": "other",
+    "alt": [
+      "ritzs"
+    ]
+  },
+  {
+    "id": "ing_lemongras",
+    "canonical": "lemongras",
+    "category": "vegetable",
+    "alt": []
+  },
+  {
+    "id": "ing_margarine",
+    "canonical": "margarine",
+    "category": "dairy",
+    "alt": [
+      "margarines"
+    ]
+  },
+  {
+    "id": "ing_rib",
+    "canonical": "rib",
+    "category": "meat",
+    "alt": [
+      "ribs"
+    ]
+  },
+  {
+    "id": "ing_tamari",
+    "canonical": "tamari",
+    "category": "condiment",
+    "alt": [
+      "tamaris"
+    ]
+  },
+  {
+    "id": "ing_sauerkraut",
+    "canonical": "sauerkraut",
+    "category": "condiment",
+    "alt": [
+      "sauerkrauts"
+    ]
+  },
+  {
+    "id": "ing_pepperoncini",
+    "canonical": "pepperoncini",
+    "category": "seasoning",
+    "alt": [
+      "pepperoncinis"
+    ]
+  },
+  {
+    "id": "ing_provolone",
+    "canonical": "provolone",
+    "category": "dairy",
+    "alt": [
+      "provolones"
+    ]
+  },
+  {
+    "id": "ing_mortadella",
+    "canonical": "mortadella",
+    "category": "meat",
+    "alt": [
+      "mortadellas"
+    ]
+  },
+  {
+    "id": "ing_guacamole",
+    "canonical": "guacamole",
+    "category": "condiment",
+    "alt": [
+      "guacamoles"
+    ]
+  },
+  {
+    "id": "ing_chutney",
+    "canonical": "chutney",
+    "category": "condiment",
+    "alt": [
+      "chutneies"
+    ]
+  },
+  {
+    "id": "ing_chorizo",
+    "canonical": "chorizo",
+    "category": "meat",
+    "alt": [
+      "chorizos"
+    ]
+  },
+  {
+    "id": "ing_okra",
+    "canonical": "okra",
+    "category": "vegetable",
+    "alt": [
+      "okras"
+    ]
+  },
+  {
+    "id": "ing_rigatoni",
+    "canonical": "rigatoni",
+    "category": "grain",
+    "alt": [
+      "rigatonis"
+    ]
+  },
+  {
+    "id": "ing_ramen",
+    "canonical": "ramen",
+    "category": "other",
+    "alt": [
+      "ramens"
+    ]
+  },
+  {
+    "id": "ing_furikake",
+    "canonical": "furikake",
+    "category": "condiment",
+    "alt": [
+      "furikakes"
+    ]
+  },
+  {
+    "id": "ing_adobo",
+    "canonical": "adobo",
+    "category": "sauce",
+    "alt": [
+      "adobos"
+    ]
+  },
+  {
+    "id": "ing_gruyere",
+    "canonical": "gruyere",
+    "category": "dairy",
+    "alt": [
+      "gruyeres"
+    ]
+  },
+  {
+    "id": "ing_chilli",
+    "canonical": "chilli",
+    "category": "seasoning",
+    "alt": [
+      "chillis"
+    ]
+  },
+  {
+    "id": "ing_biscuit",
+    "canonical": "biscuit",
+    "category": "grain",
+    "alt": [
+      "biscuits"
+    ]
+  },
+  {
+    "id": "ing_cavatappi",
+    "canonical": "cavatappi",
+    "category": "grain",
+    "alt": [
+      "cavatappis"
+    ]
+  },
+  {
+    "id": "ing_molass",
+    "canonical": "molass",
+    "category": "sweetener",
+    "alt": []
+  },
+  {
+    "id": "ing_fusilli",
+    "canonical": "fusilli",
+    "category": "grain",
+    "alt": [
+      "fusillis"
+    ]
+  },
+  {
+    "id": "ing_fontina",
+    "canonical": "fontina",
+    "category": "dairy",
+    "alt": [
+      "fontinas"
+    ]
+  },
+  {
+    "id": "ing_brisket",
+    "canonical": "brisket",
+    "category": "meat",
+    "alt": [
+      "briskets"
+    ]
+  },
+  {
+    "id": "ing_ribeye",
+    "canonical": "ribeye",
+    "category": "meat",
+    "alt": [
+      "ribeyes"
+    ]
+  },
+  {
+    "id": "ing_strawberry",
+    "canonical": "strawberry",
+    "category": "fruit",
+    "alt": [
+      "strawberries"
+    ]
+  },
+  {
+    "id": "ing_farfalle",
+    "canonical": "farfalle",
+    "category": "grain",
+    "alt": [
+      "farfalles"
+    ]
+  },
+  {
+    "id": "ing_almondmilk",
+    "canonical": "almondmilk",
+    "category": "dairy",
+    "alt": [
+      "almondmilks"
+    ]
+  },
+  {
+    "id": "ing_sausage",
+    "canonical": "sausage",
+    "category": "meat",
+    "alt": [
+      "sausages"
+    ]
+  },
+  {
+    "id": "ing_marinade",
+    "canonical": "marinade",
+    "category": "condiment",
+    "alt": [
+      "marinades"
+    ]
+  },
+  {
+    "id": "ing_cherry",
+    "canonical": "cherry",
+    "category": "fruit",
+    "alt": [
+      "cherries"
+    ]
+  },
+  {
+    "id": "ing_fish",
+    "canonical": "fish",
+    "category": "seafood",
+    "alt": [
+      "fishes"
+    ]
+  },
+  {
+    "id": "ing_artichok",
+    "canonical": "artichok",
+    "category": "vegetable",
+    "alt": [
+      "artichoks"
+    ]
+  },
+  {
+    "id": "ing_ale",
+    "canonical": "ale",
+    "category": "condiment",
+    "alt": [
+      "ales"
+    ]
+  },
+  {
+    "id": "ing_hanout",
+    "canonical": "hanout",
+    "category": "seasoning",
+    "alt": [
+      "hanouts"
+    ]
+  },
+  {
+    "id": "ing_pretzel",
+    "canonical": "pretzel",
+    "category": "other",
+    "alt": [
+      "pretzels"
+    ]
+  },
+  {
+    "id": "ing_espresso",
+    "canonical": "espresso",
+    "category": "beverage",
+    "alt": [
+      "espressos"
+    ]
+  },
+  {
+    "id": "ing_aril",
+    "canonical": "aril",
+    "category": "vegetable",
+    "alt": [
+      "arils"
+    ]
+  },
+  {
+    "id": "ing_kimchi",
+    "canonical": "kimchi",
+    "category": "condiment",
+    "alt": [
+      "kimchis"
+    ]
+  },
+  {
+    "id": "ing_pepita",
+    "canonical": "pepita",
+    "category": "nut_or_seed",
+    "alt": [
+      "pepitas"
+    ]
+  },
+  {
+    "id": "ing_pimiento",
+    "canonical": "pimiento",
+    "category": "other",
+    "alt": [
+      "pimientos"
+    ]
+  },
+  {
+    "id": "ing_marinara",
+    "canonical": "marinara",
+    "category": "sauce",
+    "alt": [
+      "marinaras"
+    ]
+  },
+  {
+    "id": "ing_cholula",
+    "canonical": "cholula",
+    "category": "condiment",
+    "alt": [
+      "cholulas"
+    ]
+  },
+  {
+    "id": "ing_pumpkin",
+    "canonical": "pumpkin",
+    "category": "vegetable",
+    "alt": [
+      "pumpkins"
+    ]
+  },
+  {
+    "id": "ing_marmalade",
+    "canonical": "marmalade",
+    "category": "condiment",
+    "alt": [
+      "marmalades"
+    ]
+  },
+  {
+    "id": "ing_yam",
+    "canonical": "yam",
+    "category": "vegetable",
+    "alt": [
+      "yams"
+    ]
+  },
+  {
+    "id": "ing_truffle",
+    "canonical": "truffle",
+    "category": "condiment",
+    "alt": [
+      "truffles"
+    ]
+  },
+  {
+    "id": "ing_anise",
+    "canonical": "anise",
+    "category": "seasoning",
+    "alt": [
+      "anises"
+    ]
+  },
+  {
+    "id": "ing_craisin",
+    "canonical": "craisin",
+    "category": "fruit",
+    "alt": [
+      "craisins"
+    ]
+  },
+  {
+    "id": "ing_vanilla",
+    "canonical": "vanilla",
+    "category": "sweetener",
+    "alt": [
+      "vanillas"
+    ]
+  },
+  {
+    "id": "ing_lamb",
+    "canonical": "lamb",
+    "category": "meat",
+    "alt": [
+      "lambs"
+    ]
+  },
+  {
+    "id": "ing_tahini",
+    "canonical": "tahini",
+    "category": "condiment",
+    "alt": [
+      "tahinis"
+    ]
+  },
+  {
+    "id": "ing_baguette",
+    "canonical": "baguette",
+    "category": "grain",
+    "alt": [
+      "baguettes"
+    ]
+  },
+  {
+    "id": "ing_heinz",
+    "canonical": "heinz",
+    "category": "condiment",
+    "alt": [
+      "heinzs"
+    ]
+  },
+  {
+    "id": "ing_season",
+    "canonical": "season",
+    "category": "seasoning",
+    "alt": [
+      "seasons"
+    ]
+  },
+  {
+    "id": "ing_canola",
+    "canonical": "canola",
+    "category": "condiment",
+    "alt": [
+      "canolas"
+    ]
+  },
+  {
+    "id": "ing_pinto",
+    "canonical": "pinto",
+    "category": "plant_protein",
+    "alt": [
+      "pintos"
+    ]
+  },
+  {
+    "id": "ing_kidney_bean",
+    "canonical": "kidney bean",
+    "category": "plant_protein",
+    "alt": [
+      "kidney beans"
+    ]
+  },
+  {
+    "id": "ing_soy",
+    "canonical": "soy",
+    "category": "condiment",
+    "alt": [
+      "soya"
+    ]
+  },
+  {
+    "id": "ing_giardiniera",
+    "canonical": "giardiniera",
+    "category": "condiment",
+    "alt": [
+      "giardinieras"
+    ]
+  },
+  {
+    "id": "ing_dashi",
+    "canonical": "dashi",
+    "category": "condiment",
+    "alt": [
+      "dashis"
+    ]
+  },
+  {
+    "id": "ing_ciabatta",
+    "canonical": "ciabatta",
+    "category": "other",
+    "alt": [
+      "ciabattas"
+    ]
+  },
+  {
+    "id": "ing_bologna",
+    "canonical": "bologna",
+    "category": "meat",
+    "alt": [
+      "bolognas"
+    ]
+  },
+  {
+    "id": "ing_hawaiian",
+    "canonical": "hawaiian",
+    "category": "fruit",
+    "alt": [
+      "hawaiians"
+    ]
+  },
+  {
+    "id": "ing_vodka",
+    "canonical": "vodka",
+    "category": "beverage",
+    "alt": [
+      "vodkas"
+    ]
+  },
+  {
+    "id": "ing_wiener",
+    "canonical": "wiener",
+    "category": "meat",
+    "alt": [
+      "wieners"
+    ]
+  },
+  {
+    "id": "ing_pecorino",
+    "canonical": "pecorino",
+    "category": "dairy",
+    "alt": [
+      "pecorinos"
+    ]
+  },
+  {
+    "id": "ing_ranch",
+    "canonical": "ranch",
+    "category": "condiment",
+    "alt": [
+      "ranches"
+    ]
+  },
+  {
+    "id": "ing_bell",
+    "canonical": "bell",
+    "category": "vegetable",
+    "alt": [
+      "bells"
+    ]
+  },
+  {
+    "id": "ing_vermouth",
+    "canonical": "vermouth",
+    "category": "beverage",
+    "alt": [
+      "vermouths"
+    ]
+  },
+  {
+    "id": "ing_naan",
+    "canonical": "naan",
+    "category": "grain",
+    "alt": [
+      "naans"
+    ]
+  },
+  {
+    "id": "ing_romaine",
+    "canonical": "romaine",
+    "category": "vegetable",
+    "alt": [
+      "romaines"
+    ]
+  },
+  {
+    "id": "ing_starch",
+    "canonical": "starch",
+    "category": "other",
+    "alt": [
+      "starches"
+    ]
+  },
+  {
+    "id": "ing_orange",
+    "canonical": "orange",
+    "category": "fruit",
+    "alt": [
+      "oranges"
+    ]
+  },
+  {
+    "id": "ing_dijon",
+    "canonical": "dijon",
+    "category": "condiment",
+    "alt": [
+      "dijons"
+    ]
+  },
+  {
+    "id": "ing_crawfish",
+    "canonical": "crawfish",
+    "category": "seafood",
+    "alt": [
+      "crawfishes"
+    ]
+  },
+  {
+    "id": "ing_penne",
+    "canonical": "penne",
+    "category": "grain",
+    "alt": [
+      "pennes"
+    ]
+  },
+  {
+    "id": "ing_linguine",
+    "canonical": "linguine",
+    "category": "grain",
+    "alt": [
+      "linguines"
+    ]
+  },
+  {
+    "id": "ing_crapmeat",
+    "canonical": "crapmeat",
+    "category": "seafood",
+    "alt": [
+      "crapmeats"
+    ]
+  },
+  {
+    "id": "ing_brie",
+    "canonical": "brie",
+    "category": "dairy",
+    "alt": [
+      "bries"
+    ]
+  },
+  {
+    "id": "ing_merlot",
+    "canonical": "merlot",
+    "category": "beverage",
+    "alt": [
+      "merlots"
+    ]
+  },
+  {
+    "id": "ing_rotini",
+    "canonical": "rotini",
+    "category": "grain",
+    "alt": [
+      "rotinis"
+    ]
+  },
+  {
+    "id": "ing_cornichon",
+    "canonical": "cornichon",
+    "category": "vegetable",
+    "alt": [
+      "cornichons"
+    ]
+  },
+  {
+    "id": "ing_labneh",
+    "canonical": "labneh",
+    "category": "condiment",
+    "alt": [
+      "labnehs"
+    ]
+  },
+  {
+    "id": "ing_edamame",
+    "canonical": "edamame",
+    "category": "plant_protein",
+    "alt": [
+      "edamames"
+    ]
+  },
+  {
+    "id": "ing_black_bean",
+    "canonical": "black bean",
+    "category": "plant_protein",
+    "alt": [
+      "black beans"
+    ]
+  },
+  {
+    "id": "ing_blackbean",
+    "canonical": "blackbean",
+    "category": "plant_protein",
+    "alt": [
+      "blackbeans"
+    ]
+  },
+  {
+    "id": "ing_cob",
+    "canonical": "cob",
+    "category": "vegetable",
+    "alt": [
+      "cobs"
+    ]
+  },
+  {
+    "id": "ing_gravy",
+    "canonical": "gravy",
+    "category": "condiment",
+    "alt": [
+      "gravies"
+    ]
+  },
+  {
+    "id": "ing_accent",
+    "canonical": "accent",
+    "category": "seasoning",
+    "alt": [
+      "accents"
+    ]
+  },
+  {
+    "id": "ing_sauce",
+    "canonical": "sauce",
+    "category": "sauce",
+    "alt": [
+      "sauces"
+    ]
+  },
+  {
+    "id": "ing_parsley",
+    "canonical": "parsley",
+    "category": "herb",
+    "alt": [
+      "parsleies"
+    ]
+  },
+  {
+    "id": "ing_fat",
+    "canonical": "fat",
+    "category": "other",
+    "alt": [
+      "fats"
+    ]
+  },
+  {
+    "id": "ing_blueberry",
+    "canonical": "blueberry",
+    "category": "fruit",
+    "alt": [
+      "blueberries"
+    ]
+  },
+  {
+    "id": "ing_bronzino",
+    "canonical": "bronzino",
+    "category": "seafood",
+    "alt": [
+      "bronzinos"
+    ]
+  },
+  {
+    "id": "ing_stout",
+    "canonical": "stout",
+    "category": "other",
+    "alt": [
+      "stouts"
+    ]
+  },
+  {
+    "id": "ing_fuji",
+    "canonical": "fuji",
+    "category": "fruit",
+    "alt": [
+      "fujis"
+    ]
+  },
+  {
+    "id": "ing_gala",
+    "canonical": "gala",
+    "category": "fruit",
+    "alt": [
+      "galas"
+    ]
+  },
+  {
+    "id": "ing_harissa",
+    "canonical": "harissa",
+    "category": "condiment",
+    "alt": [
+      "harissas"
+    ]
+  },
+  {
+    "id": "ing_braeburn",
+    "canonical": "braeburn",
+    "category": "fruit",
+    "alt": [
+      "braeburns"
+    ]
+  },
+  {
+    "id": "ing_poultry",
+    "canonical": "poultry",
+    "category": "meat",
+    "alt": [
+      "poultries"
+    ]
+  },
+  {
+    "id": "ing_beet",
+    "canonical": "beet",
+    "category": "vegetable",
+    "alt": [
+      "beets"
+    ]
+  },
+  {
+    "id": "ing_drumstick",
+    "canonical": "drumstick",
+    "category": "meat",
+    "alt": [
+      "drumsticks"
+    ]
+  },
+  {
+    "id": "ing_galbani",
+    "canonical": "galbani",
+    "category": "dairy",
+    "alt": [
+      "galbanis"
+    ]
+  },
+  {
+    "id": "ing_verde",
+    "canonical": "verde",
+    "category": "sauce",
+    "alt": [
+      "verdes"
+    ]
+  },
+  {
+    "id": "ing_vegetable",
+    "canonical": "vegetable",
+    "category": "vegetable",
+    "alt": [
+      "vegetables"
+    ]
+  },
+  {
+    "id": "ing_madras",
+    "canonical": "madras",
+    "category": "seasoning",
+    "alt": []
+  },
+  {
+    "id": "ing_pear",
+    "canonical": "pear",
+    "category": "fruit",
+    "alt": [
+      "pears"
+    ]
+  },
+  {
+    "id": "ing_protein",
+    "canonical": "protein",
+    "category": "other",
+    "alt": [
+      "proteins"
+    ]
+  },
+  {
+    "id": "ing_tzatziki",
+    "canonical": "tzatziki",
+    "category": "sauce",
+    "alt": [
+      "tzatzikis"
+    ]
+  },
+  {
+    "id": "ing_alfredo",
+    "canonical": "alfredo",
+    "category": "sauce",
+    "alt": [
+      "alfredos"
+    ]
+  },
+  {
+    "id": "ing_couscou",
+    "canonical": "couscou",
+    "category": "other",
+    "alt": [
+      "couscous"
+    ]
+  },
+  {
+    "id": "ing_chard",
+    "canonical": "chard",
+    "category": "vegetable",
+    "alt": [
+      "chards"
+    ]
+  },
+  {
+    "id": "ing_olive",
+    "canonical": "olive",
+    "category": "condiment",
+    "alt": [
+      "olives"
+    ]
+  },
+  {
+    "id": "ing_frankfurter",
+    "canonical": "frankfurter",
+    "category": "meat",
+    "alt": [
+      "frankfurters"
+    ]
+  },
+  {
+    "id": "ing_kraut",
+    "canonical": "kraut",
+    "category": "condiment",
+    "alt": [
+      "krauts"
+    ]
+  },
+  {
+    "id": "ing_bucatini",
+    "canonical": "bucatini",
+    "category": "grain",
+    "alt": [
+      "bucatinis"
+    ]
+  },
+  {
+    "id": "ing_ghee",
+    "canonical": "ghee",
+    "category": "dairy",
+    "alt": [
+      "ghees"
+    ]
+  },
+  {
+    "id": "ing_mussel",
+    "canonical": "mussel",
+    "category": "seafood",
+    "alt": [
+      "mussels"
+    ]
+  },
+  {
+    "id": "ing_katsuobushi",
+    "canonical": "katsuobushi",
+    "category": "seafood",
+    "alt": [
+      "katsuobushis"
+    ]
+  },
+  {
+    "id": "ing_ziti",
+    "canonical": "ziti",
+    "category": "grain",
+    "alt": [
+      "zitis"
+    ]
+  },
+  {
+    "id": "ing_oxtail",
+    "canonical": "oxtail",
+    "category": "meat",
+    "alt": [
+      "oxtails"
+    ]
+  },
+  {
+    "id": "ing_cardamom",
+    "canonical": "cardamom",
+    "category": "seasoning",
+    "alt": [
+      "cardamoms"
+    ]
+  },
+  {
+    "id": "ing_rotel",
+    "canonical": "rotel",
+    "category": "condiment",
+    "alt": [
+      "rotels"
+    ]
+  },
+  {
+    "id": "ing_pimento",
+    "canonical": "pimento",
+    "category": "vegetable",
+    "alt": [
+      "pimentos"
+    ]
+  },
+  {
+    "id": "ing_plum",
+    "canonical": "plum",
+    "category": "fruit",
+    "alt": [
+      "plums"
+    ]
+  },
+  {
+    "id": "ing_oelek",
+    "canonical": "oelek",
+    "category": "sauce",
+    "alt": [
+      "oeleks"
+    ]
+  },
+  {
+    "id": "ing_tomatillo",
+    "canonical": "tomatillo",
+    "category": "vegetable",
+    "alt": [
+      "tomatillos"
+    ]
+  },
+  {
+    "id": "ing_lard",
+    "canonical": "lard",
+    "category": "other",
+    "alt": [
+      "lards"
+    ]
+  },
+  {
+    "id": "ing_fig",
+    "canonical": "fig",
+    "category": "fruit",
+    "alt": [
+      "figs"
+    ]
+  },
+  {
+    "id": "ing_pie",
+    "canonical": "pie",
+    "category": "baking",
+    "alt": [
+      "pies"
+    ]
+  },
+  {
+    "id": "ing_sumac",
+    "canonical": "sumac",
+    "category": "seasoning",
+    "alt": [
+      "sumacs"
+    ]
+  },
+  {
+    "id": "ing_scallop",
+    "canonical": "scallop",
+    "category": "seafood",
+    "alt": [
+      "scallops"
+    ]
+  },
+  {
+    "id": "ing_parsnip",
+    "canonical": "parsnip",
+    "category": "vegetable",
+    "alt": [
+      "parsnips"
+    ]
+  },
+  {
+    "id": "ing_eggnog",
+    "canonical": "eggnog",
+    "category": "other",
+    "alt": [
+      "eggnogs"
+    ]
+  },
+  {
+    "id": "ing_nectarine",
+    "canonical": "nectarine",
+    "category": "fruit",
+    "alt": [
+      "nectarines"
+    ]
+  },
+  {
+    "id": "ing_marshmallow",
+    "canonical": "marshmallow",
+    "category": "sweetener",
+    "alt": [
+      "marshmallows"
+    ]
+  },
+  {
+    "id": "ing_caramel",
+    "canonical": "caramel",
+    "category": "sweetener",
+    "alt": [
+      "caramels"
+    ]
+  },
+  {
+    "id": "ing_banana",
+    "canonical": "banana",
+    "category": "fruit",
+    "alt": [
+      "bananas"
+    ]
+  }
+]
