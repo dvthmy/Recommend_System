@@ -1,0 +1,73 @@
+# Large data files (too big for Git LFS - >2GB, keep local only)
+backend/data/process/merged_datasets.csv
+backend/data/process/*.csv
+backend/data/recipes/*.csv
+backend/data/recipes/combined_*.csv
+backend/data/recipes/full_data*.csv
+backend/data/recipes/merged_*.csv
+backend/data/users/*.csv
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyc
+
+# Environment variables
+.env
+.venv/
+venv/
+env/
+ENV/
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Large image files
+
+*.gif
+*.bmp
+*.tiff
+
+# Data files (large)
+
+*.json
+!package*.json
+!tsconfig*.json
+!tsconfig.node.json
+backend/data/ingredients/*.json
+backend/data/process/*.json
+backend/backend/data/users/*.json
+
+# Logs
+*.log
+backend/logs/*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook
+
+
+# Large text files
+*.txt
+!README*.md
+!*.md
+backend/data/process/*.txt
+backend/data/ingredients/*.txt
+
+# Backup files
+*.backup
+*_backup.*
+
