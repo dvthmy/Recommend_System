@@ -44,8 +44,10 @@ async def record_interaction(user_id: str, body: InteractionRequest):
             WITH u, r, rel, coalesce(rel.last_view, datetime("1900-01-01T00:00:00")) AS last_view
             // Nếu chưa từng xem hoặc lần xem trước cách đây hơn 5 giây
             WHERE rel.last_view IS NULL OR duration.inSeconds(last_view, datetime()).seconds > 5
-            SET rel.last_view = datetime(),
+            SET rel.event_type = 'view',
+                rel.last_view = datetime(),
                 rel.view_count = coalesce(rel.view_count, 0) + 1,
+                rel.timestamp = datetime(),
                 r.popularity_views = coalesce(r.popularity_views, 0) + 1
             RETURN rel.view_count AS total_views, r.popularity_views AS recipe_views
             """
@@ -78,8 +80,10 @@ async def record_interaction(user_id: str, body: InteractionRequest):
             # Not yet liked → set liked=true and increment
             q_like = """
             MATCH (u:User {user_id:$uid})-[rel:INTERACTED_WITH]->(r:Recipe {recipe_id:$rid})
-            SET rel.liked = true,
-                rel.like_time = datetime()
+            SET rel.event_type = 'like',
+                rel.liked = true,
+                rel.like_time = datetime(),
+                rel.timestamp = datetime()
             WITH r
             SET r.popularity_likes = coalesce(r.popularity_likes, 0) + 1
             RETURN r.popularity_likes AS recipe_likes
@@ -96,8 +100,10 @@ async def record_interaction(user_id: str, body: InteractionRequest):
 
             q = """
             MATCH (u:User {user_id:$uid})-[rel:INTERACTED_WITH]->(r:Recipe {recipe_id:$rid})
-            SET rel.rating = $rating,
-                rel.rating_time = datetime()
+            SET rel.event_type = 'rating',
+                rel.rating = $rating,
+                rel.rating_time = datetime(),
+                rel.timestamp = datetime()
             WITH r, collect(rel.rating) AS all_ratings
             SET r.rating_count = size(all_ratings),
                 r.rating_value = round(reduce(total=0, x IN all_ratings | total + x) / size(all_ratings), 2)

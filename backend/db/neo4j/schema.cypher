@@ -32,7 +32,7 @@ CREATE INDEX recipe_title_index IF NOT EXISTS FOR (r:Recipe) ON (r.title);
 CREATE INDEX recipe_cooktime_index IF NOT EXISTS FOR (r:Recipe) ON (r.cook_time_min);
 CREATE INDEX recipe_created_index IF NOT EXISTS FOR (r:Recipe) ON (r.created_at);
 CREATE INDEX recipe_updated_index IF NOT EXISTS FOR (r:Recipe) ON (r.updated_at);
-CREATE INDEX recipe_rating_index IF NOT EXISTS FOR (r:Recipe) ON (r.rating_avg);
+CREATE INDEX recipe_rating_index IF NOT EXISTS FOR (r:Recipe) ON (r.rating_value);
 CREATE INDEX recipe_cuisine_index IF NOT EXISTS FOR (r:Recipe) ON (r.cuisine);
 
 CREATE INDEX ingredient_canonical_index IF NOT EXISTS FOR (i:Ingredient) ON (i.canonical_name);
@@ -51,7 +51,8 @@ ON EACH [r.title, r.instructions, r.tags];
 
 CREATE FULLTEXT INDEX ingredient_name_fts IF NOT EXISTS
 FOR (i:Ingredient)
-ON EACH [i.canonical_name, i.alt_names, i.synonyms_normalized];
+ON EACH [i.canonical_name, i.alt_names];
+// Note: synonyms_normalized removed - using alt_names and variations instead
 
 //========================
 // Suggested property structures
@@ -67,7 +68,7 @@ ON EACH [i.canonical_name, i.alt_names, i.synonyms_normalized];
 //   created_at: datetime,
 //   updated_at: datetime,
 //   cuisine: string,
-//   rating_avg: float,
+//   rating_value: float,
 //   rating_count: integer,
 //   image_urls: list<string>,
 //   popularity: {views: integer, saves: integer, cooks: integer, likes: integer},
@@ -86,33 +87,44 @@ ON EACH [i.canonical_name, i.alt_names, i.synonyms_normalized];
 // :Ingredient {
 //   ingredient_id: string,
 //   canonical_name: string,
-//   alt_names: list<string>,
-//   category: string,
-//   global_freq: integer,
-//   allergen_flag: boolean,
-//   conversions: map, // unit->grams
-//   synonyms_normalized: list<string>,
-//   seasonality: list<string>,
-//   perishability: string,
-//   nutrition_per_100g: map,
-//   image_url: string,
-//   common_substitutions: list<string>
+//   base: string,                    // Base ingredient name (e.g., "powder", "juice")
+//   category: string,                // Category (e.g., "seasoning", "beverage", "meat", "vegetable")
+//   alt_names: list<string>,         // Alternative names/variations
+//   variations: string               // JSON string of variations map (from canonical_ingredients_migrated.json)
+//                                    // Optional additional properties (may be added later):
+//   // global_freq: integer,
+//   // allergen_flag: boolean,
+//   // conversions: map, // unit->grams
+//   // synonyms_normalized: list<string>,
+//   // seasonality: list<string>,
+//   // perishability: string,
+//   // nutrition_per_100g: map,
+//   // image_url: string,
+//   // common_substitutions: list<string>
 // }
 
 // :User {
 //   user_id: string,
+//   username: string,               // Login username (for authentication)
+//   name: string,                   // Display name (optional)
+//   password_hash: string,          // Hashed password
+//   age: integer,
+//   gender: string,
 //   dietary_preferences: list<string>,
 //   allergies: list<string>, // ingredient_ids (denormalized)
 //   disliked_ingredients: list<string>, // ingredient_ids (denormalized)
 //   explicit_preferences: { fav_cuisines: list<string>, fav_tags: list<string>, disliked_cuisines: list<string> },
 //   skill_level: string,
+//   max_cook_time: integer,
 //   time_constraints: { max_cook_time: integer },
 //   user_tfidf_vector: list<float>,
 //   user_embedding: list<float>,
 //   household_size: integer,
 //   health_goals: list<string>,
 //   preferred_units: string,
-//   locale: string
+//   locale: string,
+//   created_at: datetime,
+//   updated_at: datetime
 // }
 
 //========================
@@ -131,20 +143,23 @@ ON EACH [i.canonical_name, i.alt_names, i.synonyms_normalized];
 //========================
 // Example creation templates
 //========================
-// Ingredient node
+// Ingredient node (matching canonical_ingredients_migrated.json format)
 // MERGE (i:Ingredient {ingredient_id: $ingredient_id})
 // SET i.canonical_name = $canonical_name,
-//     i.alt_names = $alt_names,
+//     i.base = $base,
 //     i.category = $category,
-//     i.global_freq = $global_freq,
-//     i.allergen_flag = $allergen_flag,
-//     i.conversions = $conversions,
-//     i.synonyms_normalized = $synonyms_normalized,
-//     i.seasonality = $seasonality,
-//     i.perishability = $perishability,
-//     i.nutrition_per_100g = $nutrition_per_100g,
-//     i.image_url = $image_url,
-//     i.common_substitutions = $common_substitutions;
+//     i.alt_names = $alt_names,
+//     i.variations = $variations  // JSON string of variations map
+// 
+// Example from canonical_ingredients_migrated.json:
+// {
+//   "ingredient_id": "ing_onion",
+//   "canonical_name": "onion",
+//   "base": "onion",
+//   "category": "vegetable",
+//   "alt_names": ["yellow onion", "white onion"],
+//   "variations": {}
+// }
 
 // Recipe node and link to cuisine and tags
 // MERGE (r:Recipe {recipe_id: $recipe_id})

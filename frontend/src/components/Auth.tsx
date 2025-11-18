@@ -75,6 +75,7 @@ const Auth: React.FC = () => {
 
       const response = await apiService.signUp({
         username: signUpData.username,
+        name: signUpData.name || undefined,
         password: signUpData.password,
         age: age,
         gender: signUpData.gender

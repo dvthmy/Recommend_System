@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/api';
 import { RecipeDetail } from '../types/api';
 import { FoodSuggestion } from '../types';
@@ -9,11 +8,9 @@ import './FoodDetail.css';
 const FoodDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useUser();
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hasViewed, setHasViewed] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -21,16 +18,22 @@ const FoodDetail: React.FC = () => {
       const alreadyViewed = sessionStorage.getItem(viewedKey);
 
       if (!alreadyViewed) {
-        setHasViewed(true);
         sessionStorage.setItem(viewedKey, "true");
         loadRecipeDetail(id);
       } else {
         loadRecipeDetail(id, false);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
 
+
+  // Helper to check if user is guest (not registered)
+  const isGuestUser = (): boolean => {
+    const hasToken = !!localStorage.getItem('access_token');
+    return !hasToken; // Guest if no access_token
+  };
 
   const loadRecipeDetail = async (recipeId: string, recordView: boolean = true) => {
     setLoading(true);
@@ -42,7 +45,8 @@ const FoodDetail: React.FC = () => {
       if (response.data) {
         setRecipe(response.data);
 
-        if (recordView) {
+        // Only record view for registered users, not guests
+        if (recordView && !isGuestUser()) {
           const userId = localStorage.getItem('userId');
           if (userId) {
             try {
@@ -116,6 +120,11 @@ const FoodDetail: React.FC = () => {
   };
 
   const handleRate = async () => {
+    if (isGuestUser()) {
+      alert('Please sign in to rate recipes. Guest ratings are not saved.');
+      return;
+    }
+    
     const userId = localStorage.getItem('userId');
     if (userId && recipe) {
       try {
@@ -133,6 +142,11 @@ const FoodDetail: React.FC = () => {
   };
 
   const handleAddToFavorites = async () => {
+    if (isGuestUser()) {
+      alert('Please sign in to save recipes. Guest favorites are not saved.');
+      return;
+    }
+    
     const userId = localStorage.getItem('userId');
     if (userId && recipe) {
       try {

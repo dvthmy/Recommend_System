@@ -21,12 +21,18 @@ const Profile: React.FC = () => {
   });
   
   // Edit modal state
+  const [editingUsername, setEditingUsername] = useState('');
+  const [editingName, setEditingName] = useState('');
+  const [editingAge, setEditingAge] = useState<number | ''>('');
+  const [editingGender, setEditingGender] = useState('');
   const [editingAllergies, setEditingAllergies] = useState<string[]>([]);
   const [editingCuisines, setEditingCuisines] = useState<{ name: string; level: number }[]>([]);
   const [availableIngredients, setAvailableIngredients] = useState<AvailableIngredient[]>([]);
   const [availableCuisines, setAvailableCuisines] = useState<string[]>([]);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [cuisineSearch, setCuisineSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<AvailableIngredient[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const hasLoadedRef = useRef(false);
 
@@ -54,6 +60,22 @@ const Profile: React.FC = () => {
     if (isEditing) {
       loadAvailableOptions();
       // Initialize editing state with current values
+      setEditingUsername(user?.username || '');
+      setEditingName(user?.name || '');
+      setEditingAge(user?.age || '');
+      // Normalize gender to match dropdown options (capitalize first letter)
+      const normalizeGender = (gender: string | undefined) => {
+        if (!gender) return '';
+        const lower = gender.toLowerCase();
+        if (lower === 'male') return 'Male';
+        if (lower === 'female') return 'Female';
+        if (lower === 'other') return 'Other';
+        // If already capitalized correctly
+        if (['Male', 'Female', 'Other'].includes(gender)) return gender;
+        // Fallback: capitalize first letter
+        return gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
+      };
+      setEditingGender(normalizeGender(user?.gender));
       if (allergies?.allergies) {
         setEditingAllergies(allergies.allergies.map((a: any) => a.ingredient_id));
       }
@@ -64,7 +86,43 @@ const Profile: React.FC = () => {
         })));
       }
     }
-  }, [isEditing, allergies, favoriteCuisines]);
+  }, [isEditing, allergies, favoriteCuisines, user]);
+
+  // Search ingredients when user types
+  useEffect(() => {
+    if (!ingredientSearch.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await apiService.searchIngredients({
+          query: ingredientSearch.trim(),
+          limit: 20,
+          offset: 0
+        });
+        
+        if (response.data && response.data.ingredients) {
+          const results: AvailableIngredient[] = response.data.ingredients.map(ing => ({
+            id: ing.ingredient_id,
+            name: ing.canonical_name || ing.name || ''
+          }));
+          setSearchResults(results);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (err) {
+        console.error('Failed to search ingredients:', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timeoutId);
+  }, [ingredientSearch]);
 
   const loadUserData = async () => {
     const userId = localStorage.getItem('userId');
@@ -152,17 +210,42 @@ const Profile: React.FC = () => {
     setIsEditing(false);
     setIngredientSearch('');
     setCuisineSearch('');
+    setEditingUsername('');
+    setEditingName('');
+    setEditingAge('');
+    setEditingGender('');
   };
 
   const handleAddAllergy = (ingredientId: string) => {
-    if (!editingAllergies.includes(ingredientId)) {
-      setEditingAllergies([...editingAllergies, ingredientId]);
-    }
+    // Use functional update to ensure we have the latest state
+    setEditingAllergies(prev => {
+      if (prev.includes(ingredientId)) {
+        return prev; // Already selected, don't add again
+      }
+      const newAllergies = [...prev, ingredientId];
+      
+      // Find ingredient data from search results or available ingredients
+      const ingredientData = searchResults.find(ing => ing.id === ingredientId) 
+        || availableIngredients.find(ing => ing.id === ingredientId);
+      
+      if (ingredientData) {
+        // Add to availableIngredients if not already there
+        setAvailableIngredients(prevAvail => {
+          if (!prevAvail.find(ing => ing.id === ingredientId)) {
+            return [...prevAvail, ingredientData];
+          }
+          return prevAvail;
+        });
+      }
+      
+      return newAllergies;
+    });
     setIngredientSearch('');
   };
 
   const handleRemoveAllergy = (ingredientId: string) => {
-    setEditingAllergies(editingAllergies.filter(id => id !== ingredientId));
+    // Remove from state immediately using functional update
+    setEditingAllergies(prev => prev.filter(id => id !== ingredientId));
   };
 
   const handleAddCuisine = (cuisineName: string) => {
@@ -186,6 +269,29 @@ const Profile: React.FC = () => {
     }
 
     try {
+      // Update user profile (name, age, gender)
+      // Note: Username cannot be changed (read-only field)
+      const profileUpdate: any = {};
+      // Username is read-only, don't include in update
+      // if (editingUsername !== (user?.username || '')) {
+      //   profileUpdate.username = editingUsername || null;
+      // }
+      if (editingName !== (user?.name || '')) {
+        profileUpdate.name = editingName || null;
+      }
+      if (editingAge !== (user?.age || '')) {
+        profileUpdate.age = editingAge === '' ? null : Number(editingAge);
+      }
+      // Normalize both genders for comparison (case-insensitive)
+      const normalizeForCompare = (g: string | undefined) => g?.toLowerCase() || '';
+      if (normalizeForCompare(editingGender) !== normalizeForCompare(user?.gender)) {
+        profileUpdate.gender = editingGender || null;
+      }
+
+      if (Object.keys(profileUpdate).length > 0) {
+        await apiService.updateUserProfile(userId, profileUpdate);
+      }
+
       // Get current allergies and cuisines
       const currentAllergyIds = allergies?.allergies?.map((a: any) => a.ingredient_id) || [];
       const currentCuisineNames = favoriteCuisines?.favorite_cuisines?.map((c: any) => c.cuisine_name) || [];
@@ -239,9 +345,41 @@ const Profile: React.FC = () => {
     navigate('/history');
   };
 
-  const filteredIngredients = availableIngredients.filter(ingredient =>
-    ingredient.name.toLowerCase().includes(ingredientSearch.toLowerCase())
+  // Use search results if available, otherwise filter from availableIngredients
+  const filteredIngredients = ingredientSearch.trim() && searchResults.length > 0
+    ? searchResults
+    : availableIngredients.filter(ingredient =>
+        ingredient.name.toLowerCase().includes(ingredientSearch.toLowerCase())
+      );
+
+  // Check if search term matches any existing ingredient (from search results or available)
+  const allIngredients = [...searchResults, ...availableIngredients];
+  const exactMatch = allIngredients.find(
+    ing => ing.name.toLowerCase() === ingredientSearch.toLowerCase().trim()
   );
+
+  // Check if we can add a new ingredient (search term doesn't match any existing ingredient)
+  const canAddNewIngredient = ingredientSearch.trim() && 
+    !exactMatch && 
+    !editingAllergies.some(id => {
+      const ing = availableIngredients.find(i => i.id === id);
+      return ing && ing.name.toLowerCase() === ingredientSearch.toLowerCase().trim();
+    });
+
+  const handleAddNewIngredient = () => {
+    if (canAddNewIngredient) {
+      // Create a temporary ID for the new ingredient
+      const newIngredient: AvailableIngredient = {
+        id: `custom-${Date.now()}`,
+        name: ingredientSearch.trim()
+      };
+      // Add to available ingredients list
+      setAvailableIngredients([...availableIngredients, newIngredient]);
+      // Add to selected allergies
+      setEditingAllergies([...editingAllergies, newIngredient.id]);
+      setIngredientSearch('');
+    }
+  };
 
   const filteredCuisines = availableCuisines.filter(cuisine =>
     cuisine.toLowerCase().includes(cuisineSearch.toLowerCase())
@@ -278,21 +416,23 @@ const Profile: React.FC = () => {
           <div className="profile-left">
             <div className="profile-avatar">
               <div className="avatar-circle">
-                {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
+                {user?.name ? user.name.charAt(0).toUpperCase() : (user?.username ? user.username.charAt(0).toUpperCase() : 'U')}
               </div>
             </div>
-            <div className="user-name">{user?.username || 'Guest User'}</div>
-            <div className="user-username">@{user?.username?.toLowerCase().replace(/\s+/g, '_') || 'guest'}</div>
-            {user?.username && (
-              <div className="user-email">{user.username}@email.com</div>
-            )}
-            <div className="user-info-icons">
+            <div className="user-name" style={{ fontSize: '1.8rem', fontWeight: '600', marginTop: '1rem' }}>
+              {user?.name || user?.username || 'Guest User'}
+            </div>
+            <div className="user-username" style={{ fontSize: '0.95rem', color: '#666', marginTop: '0.5rem' }}>
+              @{user?.username?.toLowerCase().replace(/\s+/g, '_') || 'guest'}
+            </div>
+            {/* Email removed as per user request */}
+            <div className="user-info-icons" style={{ marginTop: '1rem' }}>
               <div className="info-icon">
-                <span className="icon">👤</span>
+                <span className="icon"></span>
                 <span>{user?.gender || 'N/A'}</span>
               </div>
               <div className="info-icon">
-                <span className="icon">🎂</span>
+                <span className="icon"></span>
                 <span>{getAgeRange(user?.age)}</span>
               </div>
             </div>
@@ -347,54 +487,68 @@ const Profile: React.FC = () => {
                 <div className="edit-modal-overlay" onClick={handleCancelEdit}>
                   <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
                     <div className="edit-modal-header">
-                      <h2>Edit Food Preferences</h2>
+                      <h2>Edit Profile</h2>
                       <button className="close-btn" onClick={handleCancelEdit}>×</button>
                     </div>
                     
                     <div className="edit-modal-content">
-                      {/* Ingredient Allergies Section */}
+                      {/* Personal Information Section */}
                       <div className="edit-section">
-                        <h3>Ingredient Allergies</h3>
-                        <div className="edit-search-container">
-                          <input
-                            type="text"
-                            placeholder="Search ingredients..."
-                            value={ingredientSearch}
-                            onChange={(e) => setIngredientSearch(e.target.value)}
-                            className="edit-search-input"
-                          />
-                          {ingredientSearch && filteredIngredients.length > 0 && (
-                            <div className="edit-dropdown">
-                              {filteredIngredients
-                                .filter(ing => !editingAllergies.includes(ing.id))
-                                .slice(0, 10)
-                                .map(ingredient => (
-                                  <div
-                                    key={ingredient.id}
-                                    className="edit-dropdown-item"
-                                    onClick={() => handleAddAllergy(ingredient.id)}
-                                  >
-                                    {ingredient.name}
-                                  </div>
-                                ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="edit-tags-container">
-                          {editingAllergies.map(ingredientId => {
-                            const ingredient = availableIngredients.find(ing => ing.id === ingredientId);
-                            return ingredient ? (
-                              <span key={ingredientId} className="tag tag-allergy edit-tag">
-                                {ingredient.name}
-                                <button
-                                  className="tag-remove-btn"
-                                  onClick={() => handleRemoveAllergy(ingredientId)}
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ) : null;
-                          })}
+                        <h3>Personal Information</h3>
+                        <div className="edit-form-fields">
+                          <div className="edit-form-field">
+                            <label htmlFor="edit-username">Username (Login)</label>
+                            <input
+                              id="edit-username"
+                              type="text"
+                              placeholder="Enter username"
+                              value={editingUsername}
+                              disabled
+                              className="edit-form-input"
+                              style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed', color: '#666' }}
+                              title="Username cannot be changed"
+                            />
+                            <small style={{ color: '#666', fontSize: '0.85rem', marginTop: '4px', display: 'block' }}>
+                              Username cannot be changed
+                            </small>
+                          </div>
+                          <div className="edit-form-field">
+                            <label htmlFor="edit-name">Name (Display Name)</label>
+                            <input
+                              id="edit-name"
+                              type="text"
+                              placeholder="Enter your name"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              className="edit-form-input"
+                            />
+                          </div>
+                          <div className="edit-form-field">
+                            <label htmlFor="edit-age">Age</label>
+                            <input
+                              id="edit-age"
+                              type="number"
+                              placeholder="Enter age"
+                              min="1"
+                              max="150"
+                              value={editingAge}
+                              onChange={(e) => setEditingAge(e.target.value === '' ? '' : Number(e.target.value))}
+                              className="edit-form-input"
+                            />
+                          </div>
+                          <div className="edit-form-field">
+                            <label htmlFor="edit-gender">Gender</label>
+                            <select
+                              id="edit-gender"
+                              value={editingGender}
+                              onChange={(e) => setEditingGender(e.target.value)}
+                              className="edit-form-input"
+                            >
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
 
@@ -438,6 +592,104 @@ const Profile: React.FC = () => {
                               </button>
                             </span>
                           ))}
+                        </div>
+                      </div>
+
+                      {/* Ingredient Allergies Section */}
+                      <div className="edit-section">
+                        <h3>Ingredient Allergies</h3>
+                        <div className="edit-search-container">
+                          <input
+                            type="text"
+                            placeholder="Search or add Ingredient"
+                            value={ingredientSearch}
+                            onChange={(e) => setIngredientSearch(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && canAddNewIngredient) {
+                                handleAddNewIngredient();
+                              }
+                            }}
+                            className="edit-search-input"
+                          />
+                          {ingredientSearch && (filteredIngredients.length > 0 || canAddNewIngredient || isSearching) && (
+                            <div className="edit-dropdown">
+                              {isSearching && (
+                                <div className="edit-dropdown-item" style={{ textAlign: 'center', color: '#666' }}>
+                                  Searching...
+                                </div>
+                              )}
+                              {!isSearching && filteredIngredients.slice(0, 10).map((ingredient: AvailableIngredient) => {
+                                // Only show checkmark if ingredient is actually in editingAllergies
+                                const isSelected = editingAllergies.includes(ingredient.id);
+                                return (
+                                  <div
+                                    key={ingredient.id}
+                                    className={`edit-dropdown-item ${isSelected ? 'selected' : ''}`}
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        handleRemoveAllergy(ingredient.id);
+                                      } else {
+                                        handleAddAllergy(ingredient.id);
+                                      }
+                                    }}
+                                  >
+                                    {isSelected && (
+                                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="allergy-checkmark">
+                                        <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    )}
+                                    <span className={isSelected ? 'selected-text' : ''}>{ingredient.name}</span>
+                                  </div>
+                                );
+                              })}
+                              {canAddNewIngredient && (
+                                <div
+                                  className="edit-dropdown-item add-new"
+                                  onClick={handleAddNewIngredient}
+                                >
+                                  <span>Add "{ingredientSearch.trim()}"</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="edit-tags-container">
+                          {editingAllergies.map(ingredientId => {
+                            // Try to find in availableIngredients or searchResults first
+                            let ingredient = availableIngredients.find(ing => ing.id === ingredientId)
+                              || searchResults.find(ing => ing.id === ingredientId);
+                            
+                            // If not found, fallback to allergies data to get the name
+                            if (!ingredient && allergies?.allergies) {
+                              const allergyData = allergies.allergies.find((a: any) => a.ingredient_id === ingredientId);
+                              if (allergyData) {
+                                ingredient = {
+                                  id: ingredientId,
+                                  name: allergyData.ingredient_name || ingredientId
+                                };
+                              }
+                            }
+                            
+                            // If still not found, use ingredient_id as fallback
+                            if (!ingredient) {
+                              ingredient = {
+                                id: ingredientId,
+                                name: ingredientId
+                              };
+                            }
+                            
+                            return (
+                              <span key={ingredientId} className="tag tag-allergy edit-tag">
+                                {ingredient.name}
+                                <button
+                                  className="tag-remove-btn"
+                                  onClick={() => handleRemoveAllergy(ingredientId)}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>

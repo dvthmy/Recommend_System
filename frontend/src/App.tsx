@@ -3,7 +3,6 @@ import { UserProvider } from './contexts/UserContext';
 import Navigation from './components/Navigation';
 import Home from './components/Home';
 import Onboarding from './components/Onboarding';
-import UploadIngredients from './components/UploadIngredients';
 import FoodSuggestions from './components/FoodSuggestions';
 import FoodDetail from './components/FoodDetail';
 import IngredientDetail from './components/IngredientDetail';
@@ -26,7 +25,6 @@ function AppContent() {
           <Route path="/signup" element={<Auth />} />
           <Route path="/signin" element={<Auth />} />
           <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/upload" element={<UploadIngredients />} />
           <Route path="/suggestions" element={<FoodSuggestions />} />
                 <Route path="/food/:id" element={<FoodDetail />} />
                 <Route path="/ingredient/:id" element={<IngredientDetail />} />

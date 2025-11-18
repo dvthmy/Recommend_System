@@ -108,7 +108,7 @@ class ApiService {
     });
   }
 
-  async signUp(data: { username: string; password: string; age: number; gender: string }): Promise<ApiResponse<UserProfile>> {
+  async signUp(data: { username: string; name?: string; password: string; age: number; gender: string }): Promise<ApiResponse<UserProfile>> {
     return this.request<UserProfile>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),

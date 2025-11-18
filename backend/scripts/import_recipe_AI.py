@@ -732,13 +732,24 @@ def normalize_cuisine_name(name: Optional[str]) -> Optional[str]:
 
 
 def parse_cuisines(raw: Optional[str]) -> List[str]:
-    """Split and normalize multiple cuisines from CSV field."""
+    """Split and normalize multiple cuisines from CSV field.
+    
+    Handles formats like:
+    - "Korean, Vietnamese" -> ["Korean", "Vietnamese"]
+    - "Korean;Vietnamese" -> ["Korean", "Vietnamese"]
+    - "Korean/Vietnamese" -> ["Korean", "Vietnamese"]
+    - "Korean" -> ["Korean"]
+    """
     if not raw:
         return []
+    # Split by common separators: comma, semicolon, slash, pipe
     parts = REGEX_CUISINE_SEPARATORS.split(str(raw))
     cuisines: List[str] = []
     for c in parts:
-        cname = normalize_cuisine_name(c.strip())
+        c = c.strip()  # Remove whitespace
+        if not c:  # Skip empty strings
+            continue
+        cname = normalize_cuisine_name(c)
         if cname and cname not in cuisines:
             cuisines.append(cname)
     return cuisines
@@ -1724,9 +1735,18 @@ def build_recipe_props(row: Dict[str, str]) -> Dict:
         return total
 
     def to_float(x: str) -> Optional[float]:
+        """Parse float from string, handling units like '507 kcal', '14 g', '385 mg'."""
+        if not x or x in ("", "N/A", "None"):
+            return None
         try:
-            return float(x) if x not in (None, "", "N/A") else None
-        except Exception:
+            # Try direct conversion first
+            return float(x)
+        except (ValueError, TypeError):
+            # Extract number from string with units (e.g., "507 kcal" -> 507.0, "14 g" -> 14.0, "1.5 g" -> 1.5)
+            # Match number (with optional decimal) at the start of string
+            match = re.match(r'^([0-9]+(?:\.[0-9]+)?)', str(x).strip())
+            if match:
+                return float(match.group(1))
             return None
 
     def to_int(x: str) -> Optional[int]:
@@ -1759,7 +1779,7 @@ def build_recipe_props(row: Dict[str, str]) -> Dict:
         "source_url": row.get("url"),
 
         # Ratings
-        "rating_avg": to_float(row.get("rating_value")),
+        "rating_value": to_float(row.get("rating_value")),
         "rating_count": to_int(row.get("rating_count")),
         "review_count": to_int(row.get("review_count")),
 
@@ -1811,8 +1831,9 @@ def format_cypher_value(val: any) -> str:
 
 def generate_cypher_file(recipes: List[Dict], output_path: Path, verbose: bool = False, log_batch_size: int = 100) -> None:
     """
-    Generate Cypher import file with individual MERGE statements for each recipe.
-    Similar to import_canonical_ingredients.py but for recipes.
+    Generate Cypher import file using UNWIND pattern with parameterized queries.
+    This is much more efficient than individual MERGE statements.
+    Similar to build_cypher_batch but writes to file with :param rows => {...}
     
     Args:
         recipes: List of recipe dictionaries
@@ -1821,91 +1842,32 @@ def generate_cypher_file(recipes: List[Dict], output_path: Path, verbose: bool =
         log_batch_size: Log progress every N recipes (default: 100)
     """
     print(f"[*] Generating Cypher file: {output_path}")
-    print(f"   Using individual MERGE statements for {len(recipes)} recipes")
-    print(f"   Logging progress every {log_batch_size} recipes")
+    print(f"   Using UNWIND pattern with parameterized queries for {len(recipes)} recipes")
+    print(f"   This is much more efficient than individual MERGE statements")
     
-    cypher_lines = []
-    total = len(recipes)
     start_time = time.time()
     
+    # Prepare data in the format expected by build_cypher_batch
+    rows_data = []
     for idx, recipe in enumerate(recipes, 1):
-        if idx % log_batch_size == 0:  # Progress logging
-            cypher_lines.append(f"// Progress: {idx}/{total} recipes")
+        if idx % log_batch_size == 0:
             elapsed = time.time() - start_time
             rate = idx / elapsed if elapsed > 0 else 0
-            remaining = total - idx
+            remaining = len(recipes) - idx
             eta = remaining / rate if rate > 0 else 0
-            print(f"[cypher] Progress: {idx}/{total} recipes ({idx*100//total}%) - {rate:.1f} recipes/sec - ETA: {eta:.0f}s")
+            print(f"[cypher] Progress: {idx}/{len(recipes)} recipes ({idx*100//len(recipes)}%) - {rate:.1f} recipes/sec - ETA: {eta:.0f}s")
         
-        recipe_id = recipe["recipe_id"].replace("'", "\\'")
-        props = recipe["props"]
-        tags = recipe.get("tags", [])
-        ingredients = recipe.get("ingredients", [])
-        cuisines = props.get("cuisine", [])
+        rows_data.append(recipe)
         
-        # Recipe node
-        cypher_lines.append(f"MERGE (r{idx}:Recipe {{recipe_id: '{recipe_id}'}})")
-        cypher_lines.append(f"SET r{idx}.title = {format_cypher_value(props.get('title'))},")
-        cypher_lines.append(f"    r{idx}.description = {format_cypher_value(props.get('description'))},")
-        cypher_lines.append(f"    r{idx}.instructions = {format_cypher_value(props.get('instructions'))},")
-        cypher_lines.append(f"    r{idx}.tags = {format_cypher_value(props.get('tags'))},")
-        cypher_lines.append(f"    r{idx}.prep_time_min = {format_cypher_value(props.get('prep_time_min'))},")
-        cypher_lines.append(f"    r{idx}.cook_time_min = {format_cypher_value(props.get('cook_time_min'))},")
-        cypher_lines.append(f"    r{idx}.total_time_min = {format_cypher_value(props.get('total_time_min'))},")
-        cypher_lines.append(f"    r{idx}.servings = {format_cypher_value(props.get('servings'))},")
-        cypher_lines.append(f"    r{idx}.yield = {format_cypher_value(props.get('yield'))},")
-        cypher_lines.append(f"    r{idx}.cuisine = {format_cypher_value(props.get('cuisine'))},")
-        cypher_lines.append(f"    r{idx}.recipe_category = {format_cypher_value(props.get('recipe_category'))},")
-        cypher_lines.append(f"    r{idx}.source_url = {format_cypher_value(props.get('source_url'))},")
-        cypher_lines.append(f"    r{idx}.rating_avg = {format_cypher_value(props.get('rating_avg'))},")
-        cypher_lines.append(f"    r{idx}.rating_count = {format_cypher_value(props.get('rating_count'))},")
-        cypher_lines.append(f"    r{idx}.review_count = {format_cypher_value(props.get('review_count'))},")
-        cypher_lines.append(f"    r{idx}.popularity_views = {format_cypher_value(props.get('popularity_views', 0))},")
-        cypher_lines.append(f"    r{idx}.popularity_saves = {format_cypher_value(props.get('popularity_saves', 0))},")
-        cypher_lines.append(f"    r{idx}.popularity_cooks = {format_cypher_value(props.get('popularity_cooks', 0))},")
-        cypher_lines.append(f"    r{idx}.popularity_likes = {format_cypher_value(props.get('popularity_likes', 0))},")
-        cypher_lines.append(f"    r{idx}.nutrition_calories = {format_cypher_value(props.get('nutrition_calories'))},")
-        cypher_lines.append(f"    r{idx}.nutrition_protein = {format_cypher_value(props.get('nutrition_protein'))},")
-        cypher_lines.append(f"    r{idx}.nutrition_fat = {format_cypher_value(props.get('nutrition_fat'))},")
-        cypher_lines.append(f"    r{idx}.nutrition_carbohydrate = {format_cypher_value(props.get('nutrition_carbohydrate'))},")
-        cypher_lines.append(f"    r{idx}.nutrition_fiber = {format_cypher_value(props.get('nutrition_fiber'))},")
-        cypher_lines.append(f"    r{idx}.nutrition_sugar = {format_cypher_value(props.get('nutrition_sugar'))},")
-        cypher_lines.append(f"    r{idx}.nutrition_sodium = {format_cypher_value(props.get('nutrition_sodium'))},")
-        cypher_lines.append(f"    r{idx}.image_urls = {format_cypher_value(props.get('image_urls'))};")
-        cypher_lines.append("")
-        
-        # Tag relationships
-        for tag in tags:
-            if tag:
-                tag_escaped = tag.replace("'", "\\'")
-                cypher_lines.append(f"MATCH (r{idx}:Recipe {{recipe_id: '{recipe_id}'}})")
-                cypher_lines.append(f"MERGE (t{idx}:Tag {{name: '{tag_escaped}'}})")
-                cypher_lines.append(f"MERGE (r{idx})-[:TAGGED_AS]->(t{idx});")
-                cypher_lines.append("")
-        
-        # Ingredient relationships
-        for ing in ingredients:
-            ing_id = ing.get("ingredient_id", "").replace("'", "\\'")
-            if ing_id:
-                cypher_lines.append(f"MATCH (r{idx}:Recipe {{recipe_id: '{recipe_id}'}})")
-                cypher_lines.append(f"MATCH (i{idx}:Ingredient {{ingredient_id: '{ing_id}'}})")
-                cypher_lines.append(f"MERGE (r{idx})-[rel{idx}:HAS_INGREDIENT]->(i{idx})")
-                cypher_lines.append(f"SET rel{idx}.qty = {format_cypher_value(ing.get('qty'))},")
-                cypher_lines.append(f"    rel{idx}.unit = {format_cypher_value(ing.get('unit'))},")
-                cypher_lines.append(f"    rel{idx}.optional = {format_cypher_value(ing.get('optional_flag', False))},")
-                cypher_lines.append(f"    rel{idx}.prep = {format_cypher_value(ing.get('prep'))};")
-                cypher_lines.append("")
-        
-        # Cuisine relationships
-        for cuisine in cuisines:
-            if cuisine:
-                cuisine_escaped = cuisine.replace("'", "\\'")
-                cypher_lines.append(f"MATCH (r{idx}:Recipe {{recipe_id: '{recipe_id}'}})")
-                cypher_lines.append(f"MERGE (cu{idx}:Cuisine {{name: '{cuisine_escaped}'}})")
-                cypher_lines.append(f"MERGE (r{idx})-[:OF_CUISINE]->(cu{idx});")
-                cypher_lines.append("")
+    # Build the parameter JSON
+    # json.dumps() automatically serializes None to null in JSON
+    param_json = json.dumps({"rows": rows_data}, ensure_ascii=False)
     
-    cypher_content = "\n".join(cypher_lines)
+    # Get the Cypher query template from build_cypher_batch
+    cypher_query = build_cypher_batch([])
+        
+    # Combine parameter definition with query
+    cypher_content = f":param rows => {param_json};\n\n{cypher_query}"
     
     output_path.parent.mkdir(parents=True, exist_ok=True)
     print(f"[cypher] Writing file to {output_path}...")
@@ -1940,7 +1902,7 @@ def build_cypher_batch(_: List[Dict]) -> str:
     lines.append("    r.cuisine = row.props.cuisine,")
     lines.append("    r.recipe_category = row.props.recipe_category,")
     lines.append("    r.source_url = row.props.source_url,")
-    lines.append("    r.rating_avg = row.props.rating_avg,")
+    lines.append("    r.rating_value = row.props.rating_value,")
     lines.append("    r.rating_count = row.props.rating_count,")
     lines.append("    r.review_count = row.props.review_count,")
     lines.append("    r.popularity_views = coalesce(row.props.popularity_views,0),")
@@ -1957,12 +1919,6 @@ def build_cypher_batch(_: List[Dict]) -> str:
     lines.append("    r.image_urls = row.props.image_urls")
     lines.append("WITH r, row")
 
-    # Tag relationships
-    lines.append("UNWIND coalesce(row.tags, []) AS tagName")
-    lines.append("MERGE (t:Tag {name: tagName})")
-    lines.append("MERGE (r)-[:TAGGED_AS]->(t)")
-    lines.append("WITH r, row")
-
     # Ingredient relationships
     # Pattern similar to import_canonical_ingredients.py: ensure ingredients exist, then create relationships
     # Note: Ingredients must be imported first using import_canonical_ingredients.py
@@ -1974,11 +1930,6 @@ def build_cypher_batch(_: List[Dict]) -> str:
     lines.append("  MATCH (i:Ingredient {ingredient_id: ing.ingredient_id})")
     lines.append("  // Create or update HAS_INGREDIENT relationship (similar to MERGE pattern in import_canonical_ingredients.py)")
     lines.append("  MERGE (r)-[rel:HAS_INGREDIENT]->(i)")
-    lines.append("  // Set relationship properties (using SET like import_canonical_ingredients.py)")
-    lines.append("  SET rel.qty = ing.qty,")
-    lines.append("      rel.unit = ing.unit,")
-    lines.append("      rel.optional = coalesce(ing.optional_flag, false),")
-    lines.append("      rel.prep = ing.prep")
     lines.append("  RETURN count(*) AS _")
     lines.append("}")
     lines.append("WITH r, row")
@@ -2405,7 +2356,7 @@ def main() -> None:
                         if not already_matched and t not in semantic_batch_tokens:
                             semantic_batch_tokens.append(t)
 
-            ingredients_edges = [{"ingredient_id": iid, "qty": None, "unit": None, "optional_flag": False, "prep": None} for iid in mapped_ids]
+            ingredients_edges = [{"ingredient_id": iid} for iid in mapped_ids]
             recipe_data = {"recipe_id": recipe_id, "props": props, "tags": props.get("tags", []), "ingredients": ingredients_edges}
             batch_rows.append(recipe_data)
             

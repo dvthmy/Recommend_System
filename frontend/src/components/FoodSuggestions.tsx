@@ -25,6 +25,8 @@ const FoodSuggestions: React.FC = () => {
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null);
   const [editSearch, setEditSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<AvailableIngredient[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   
   // Upload image modal state
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -41,19 +43,92 @@ const FoodSuggestions: React.FC = () => {
 
   useEffect(() => {
     loadAvailableIngredients();
-    // Load ingredients from localStorage
-    const savedIngredients = JSON.parse(localStorage.getItem('uploadedIngredients') || '[]');
-    if (savedIngredients.length > 0) {
-      setSelectedIngredients(savedIngredients.map((ing: any) => ing.id || ing.name).filter(Boolean));
-    }
   }, []);
 
-  // Removed auto-load - only load when user clicks "Get Suggestions" button
-  // useEffect(() => {
-  //   if (user?.user_id && selectedIngredients.length > 0) {
-  //     loadRecommendations();
-  //   }
-  // }, [user, selectedIngredients]);
+  // Load ingredients from localStorage after availableIngredients are loaded
+  useEffect(() => {
+    if (availableIngredients.length > 0) {
+      try {
+        const savedIngredients = JSON.parse(localStorage.getItem('uploadedIngredients') || '[]');
+        if (savedIngredients.length > 0) {
+          // Restore custom ingredients to availableIngredients state
+          const customIngredients = savedIngredients
+            .filter((ing: any) => {
+              const id = ing.id || ing.name;
+              return id.startsWith('custom-') && ing.name;
+            })
+            .map((ing: any) => ({
+              id: ing.id,
+              name: ing.name
+            }))
+            .filter((ing: AvailableIngredient) => {
+              // Only add if not already in availableIngredients
+              return !availableIngredients.some(avail => avail.id === ing.id);
+            });
+          
+          if (customIngredients.length > 0) {
+            setAvailableIngredients(prev => [...prev, ...customIngredients]);
+          }
+          
+          // Only load ingredients that actually exist in availableIngredients or are custom
+          const validIngredientIds = savedIngredients
+            .map((ing: any) => ing.id || ing.name)
+            .filter((id: string) => {
+              // Check if ingredient exists in availableIngredients or if it's a custom ingredient
+              return availableIngredients.some(ing => ing.id === id) || id.startsWith('custom-');
+            });
+          setSelectedIngredients(validIngredientIds);
+          
+          // Clean up localStorage to remove invalid ingredients
+          if (validIngredientIds.length !== savedIngredients.length) {
+            const validSaved = savedIngredients.filter((ing: any) => {
+              const id = ing.id || ing.name;
+              return validIngredientIds.includes(id);
+            });
+            localStorage.setItem('uploadedIngredients', JSON.stringify(validSaved));
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load ingredients from localStorage:', e);
+      }
+    }
+  }, [availableIngredients.length]);
+
+  // Search ingredients when user types
+  useEffect(() => {
+    if (!ingredientSearch.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await apiService.searchIngredients({
+          query: ingredientSearch.trim(),
+          limit: 20,
+          offset: 0
+        });
+        
+        if (response.data && response.data.ingredients) {
+          const results: AvailableIngredient[] = response.data.ingredients.map(ing => ({
+            id: ing.ingredient_id,
+            name: ing.canonical_name || ing.name || ''
+          }));
+          setSearchResults(results);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (err) {
+        console.error('Failed to search ingredients:', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timeoutId);
+  }, [ingredientSearch]);
 
   const loadAvailableIngredients = async () => {
     try {
@@ -76,34 +151,102 @@ const FoodSuggestions: React.FC = () => {
         throw new Error('User not initialized');
       }
       
+      const ingredientIds = selectedIngredients.filter(id => !id.startsWith('custom-'));
+      
+      // Extract ingredient names from custom ingredients
+      // First try to find in availableIngredients, then check localStorage
+      const ingredientNames = selectedIngredients
+        .filter(id => id.startsWith('custom-'))
+        .map(id => {
+          // Try to find in availableIngredients first
+          const ing = availableIngredients.find(ingredient => ingredient.id === id);
+          if (ing?.name?.trim()) {
+            return ing.name.trim();
+          }
+          
+          // If not found, check localStorage
+          try {
+            const saved = JSON.parse(localStorage.getItem('uploadedIngredients') || '[]');
+            const savedIng = saved.find((item: any) => item.id === id);
+            if (savedIng?.name?.trim()) {
+              return savedIng.name.trim();
+            }
+          } catch (e) {
+            console.warn('Failed to parse localStorage for ingredients:', e);
+          }
+          
+          // Last resort: try to extract from ID (but this should rarely happen)
+          const extracted = id.replace('custom-', '').trim();
+          // Only use if it doesn't look like a timestamp (all digits)
+          if (!/^\d+$/.test(extracted)) {
+            return extracted;
+          }
+          
+          // If it's a timestamp, return empty string (will be filtered out)
+          console.warn(`Could not find name for custom ingredient ID: ${id}`);
+          return '';
+        })
+        .filter(name => name.length > 0);
+
       const request: RecommendationRequest = {
         user_id: user.user_id,
-        ingredient_ids: selectedIngredients.length > 0 ? selectedIngredients : undefined,
+        ingredient_ids: ingredientIds.length > 0 ? ingredientIds : undefined,
+        ingredient_names: ingredientNames.length > 0 ? ingredientNames : undefined,
         max_cook_time: user.max_cook_time,
-        limit: 10
+        limit: 10,
+        min_match_ratio: 0.3  // Lower threshold to get more results
       };
+
+      console.log('🔍 Recommendation Request:', {
+        user_id: request.user_id,
+        ingredient_ids: request.ingredient_ids,
+        ingredient_names: request.ingredient_names,
+        ingredient_ids_count: request.ingredient_ids?.length || 0,
+        ingredient_names_count: request.ingredient_names?.length || 0,
+        max_cook_time: request.max_cook_time,
+        limit: request.limit
+      });
 
       const response = await apiService.getRecommendations(request);
       
+      console.log('📥 Recommendation Response:', {
+        has_data: !!response.data,
+        results_count: response.data?.results?.length || 0,
+        total: response.data?.total || 0,
+        error: response.error
+      });
+      
       if (response.data) {
-        const convertedSuggestions = response.data.results.map((recipe: RecipeRecommendation) => ({
-          id: recipe.recipe_id,
-          name: recipe.title,
-          description: `Delicious ${recipe.cuisine} dish`,
-          ingredients: [],
-          cookingTime: recipe.cook_time_min ? `${recipe.cook_time_min} minutes` : 'Unknown',
-          difficulty: 'Medium' as const,
-          cuisine: recipe.cuisine,
-          mealType: ['Lunch', 'Dinner'],
-          dietaryTags: [],
-          image: (typeof recipe.image === 'string' ? recipe.image : 
-            (Array.isArray((recipe as any).image_urls) && (recipe as any).image_urls.length > 0
-              ? (recipe as any).image_urls[0]
-              : 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop')) as string,
-          matchScore: Math.round(recipe.score * 100)
-        }));
-        
-        setSuggestions(convertedSuggestions);
+        if (response.data.results.length === 0) {
+          console.warn('No recommendations returned for request', request);
+          setError('Không tìm thấy món nào phù hợp với nguyên liệu hiện tại.');
+          loadMockSuggestions();
+        } else {
+          const convertedSuggestions = response.data.results.map((recipe: RecipeRecommendation) => {
+            const rawScore = typeof recipe.score === 'number'
+              ? recipe.score
+              : (recipe as RecipeRecommendation & { match_percent?: number }).match_percent ?? 0;
+
+            return {
+            id: recipe.recipe_id,
+            name: recipe.title,
+            description: `Delicious ${recipe.cuisine} dish`,
+            ingredients: [],
+            cookingTime: recipe.cook_time_min ? `${recipe.cook_time_min} minutes` : 'Unknown',
+            difficulty: 'Medium' as const,
+            cuisine: recipe.cuisine,
+            mealType: ['Lunch', 'Dinner'],
+            dietaryTags: [],
+            image: (typeof recipe.image === 'string' ? recipe.image :
+              (Array.isArray((recipe as any).image_urls) && (recipe as any).image_urls.length > 0
+                ? (recipe as any).image_urls[0]
+                : 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop')) as string,
+            matchScore: Math.round(Number(rawScore))
+          };
+          });
+          
+          setSuggestions(convertedSuggestions);
+        }
       } else if (response.error) {
         setError(response.error);
         loadMockSuggestions();
@@ -155,30 +298,49 @@ const FoodSuggestions: React.FC = () => {
 
   // Manual ingredient handlers
   const handleAddIngredient = (ingredientId: string) => {
-    if (!selectedIngredients.includes(ingredientId)) {
-      const newIngredients = [...selectedIngredients, ingredientId];
-      setSelectedIngredients(newIngredients);
-      setIngredientSearch('');
+    // Use functional update to ensure we have the latest state
+    setSelectedIngredients(prev => {
+      if (prev.includes(ingredientId)) {
+        return prev; // Already selected, don't add again
+      }
+      const newIngredients = [...prev, ingredientId];
       
-      // Save to localStorage
-      const ingredientData = availableIngredients.find(ing => ing.id === ingredientId);
+      // Find ingredient data from search results or available ingredients
+      const ingredientData = searchResults.find(ing => ing.id === ingredientId) 
+        || availableIngredients.find(ing => ing.id === ingredientId);
+      
       if (ingredientData) {
+        // Add to availableIngredients if not already there
+        setAvailableIngredients(prevAvail => {
+          if (!prevAvail.find(ing => ing.id === ingredientId)) {
+            return [...prevAvail, ingredientData];
+          }
+          return prevAvail;
+        });
+        
+        // Save to localStorage
         const saved = JSON.parse(localStorage.getItem('uploadedIngredients') || '[]');
-        if (!saved.find((s: any) => s.id === ingredientId)) {
+        if (!saved.find((s: any) => (s.id || s.name) === ingredientId)) {
           saved.push({ id: ingredientData.id, name: ingredientData.name });
           localStorage.setItem('uploadedIngredients', JSON.stringify(saved));
         }
       }
-    }
+      
+      return newIngredients;
+    });
+    setIngredientSearch('');
   };
 
   const handleRemoveIngredient = (ingredientId: string) => {
-    const newIngredients = selectedIngredients.filter(id => id !== ingredientId);
-    setSelectedIngredients(newIngredients);
+    // Remove from state immediately
+    setSelectedIngredients(prev => prev.filter(id => id !== ingredientId));
     
     // Update localStorage
     const saved = JSON.parse(localStorage.getItem('uploadedIngredients') || '[]');
-    const updated = saved.filter((ing: any) => ing.id !== ingredientId);
+    const updated = saved.filter((ing: any) => {
+      const id = ing.id || ing.name;
+      return id !== ingredientId;
+    });
     localStorage.setItem('uploadedIngredients', JSON.stringify(updated));
   };
 
@@ -204,13 +366,16 @@ const FoodSuggestions: React.FC = () => {
     }
   };
 
-  // Show all ingredients that match search, including selected ones
-  const filteredIngredients = availableIngredients.filter(ingredient =>
-    ingredient.name.toLowerCase().includes(ingredientSearch.toLowerCase())
-  );
+  // Use search results if available, otherwise filter from availableIngredients
+  const filteredIngredients = ingredientSearch.trim() && searchResults.length > 0
+    ? searchResults
+    : availableIngredients.filter(ingredient =>
+        ingredient.name.toLowerCase().includes(ingredientSearch.toLowerCase())
+      );
 
-  // Check if search term matches any existing ingredient
-  const exactMatch = availableIngredients.find(
+  // Check if search term matches any existing ingredient (from search results or available)
+  const allIngredients = [...searchResults, ...availableIngredients];
+  const exactMatch = allIngredients.find(
     ing => ing.name.toLowerCase() === ingredientSearch.toLowerCase().trim()
   );
 
@@ -351,8 +516,22 @@ const FoodSuggestions: React.FC = () => {
     setUserRating(0);
   };
 
+  // Helper to check if user is guest (not registered)
+  const isGuestUser = (): boolean => {
+    const hasToken = !!localStorage.getItem('access_token');
+    return !hasToken; // Guest if no access_token
+  };
+
   const submitRating = async () => {
     if (ratingModal.foodId && userRating > 0) {
+      // Don't save ratings for guest users
+      if (isGuestUser()) {
+        alert('Please sign in to rate recipes. Guest ratings are not saved.');
+        setRatingModal({ isOpen: false, foodId: null });
+        setUserRating(0);
+        return;
+      }
+      
       try {
         if (!user?.user_id) {
           throw new Error('User not initialized');
@@ -422,9 +601,15 @@ const FoodSuggestions: React.FC = () => {
                   }}
                   className="ingredient-search-input"
                 />
-                {ingredientSearch && (filteredIngredients.length > 0 || canAddNewIngredient) && (
+                {ingredientSearch && (filteredIngredients.length > 0 || canAddNewIngredient || isSearching) && (
                   <div className="ingredient-dropdown">
-                    {filteredIngredients.slice(0, 10).map((ingredient) => {
+                    {isSearching && (
+                      <div className="ingredient-dropdown-item" style={{ textAlign: 'center', color: '#666' }}>
+                        Searching...
+                      </div>
+                    )}
+                    {!isSearching && filteredIngredients.slice(0, 10).map((ingredient) => {
+                      // Only show checkmark if ingredient is actually in selectedIngredients
                       const isSelected = selectedIngredients.includes(ingredient.id);
                       return (
                         <div
@@ -479,15 +664,6 @@ const FoodSuggestions: React.FC = () => {
             
             {selectedIngredients.length > 0 && (
               <>
-                <div className="get-suggestions-button-container">
-                  <button
-                    className="btn btn-primary btn-lg"
-                    onClick={loadRecommendations}
-                    disabled={loading || !user?.user_id}
-                  >
-                    {loading ? 'Loading...' : 'Get Suggestions'}
-                  </button>
-                </div>
                 <div className="selected-ingredients-tags">
                 {selectedIngredients.map(ingredientId => {
                   const ingredient = availableIngredients.find(ing => ing.id === ingredientId);
@@ -567,6 +743,22 @@ const FoodSuggestions: React.FC = () => {
                   ) : null;
                 })}
               </div>
+                <div className="get-suggestions-button-container">
+                  <button
+                    className="btn btn-primary btn-lg"
+                    onClick={() => {
+                      console.log('Get Suggestions clicked', { 
+                        user_id: user?.user_id, 
+                        ingredients: selectedIngredients.length,
+                        loading 
+                      });
+                      loadRecommendations();
+                    }}
+                    disabled={loading || !user?.user_id || selectedIngredients.length === 0}
+                  >
+                    {loading ? 'Loading...' : hasRequestedSuggestions ? 'Refresh Suggestions' : 'Get Suggestions'}
+                  </button>
+                </div>
               </>
             )}
           </div>

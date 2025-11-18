@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import settings
-from api.routers import recommend, users, recipes, ingredients, interactions, detect, auth
+from api.routers import recommend, users, recipes, ingredients, interactions, detect, auth, cuisines
 from api.db import close_driver
 
 
@@ -51,6 +51,7 @@ app.include_router(recipes.router)
 app.include_router(ingredients.router)
 app.include_router(interactions.router)
 app.include_router(detect.router)
+app.include_router(cuisines.router)
 
 
 # =====================================

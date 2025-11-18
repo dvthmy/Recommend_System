@@ -305,66 +305,66 @@ if __name__ == "__main__":
     cleanup_old_data(driver, session_kwargs)
     print("\n🚀 Running FULL PIPELINE (PASS1 + PASS2 + PASS3)...\n")
 
-    # # -------- PASS1 --------
-    # print("[PASS1] Counting DF for text tokens & ingredient IDs ...")
-    # df_text, df_ing = Counter(), Counter()
-    # total_docs = 0
+    # -------- PASS1 --------
+    print("[PASS1] Counting DF for text tokens & ingredient IDs ...")
+    df_text, df_ing = Counter(), Counter()
+    total_docs = 0
 
-    # with driver.session(**session_kwargs) as session:
-    #     skip, pages = 0, 0
-    #     while True:
-    #         rows = session.execute_read(fetch_recipes_paged, skip, DEFAULT_BATCH)
-    #         if not rows:
-    #             break
-    #         for row in rows:
-    #             cuisine_str = " ".join(row["cuisine"]) if isinstance(row["cuisine"], list) else str(row["cuisine"] or "")
-    #             text = " ".join([str(row["title"] or ""), " ".join(row["tags"] or []), str(row["instr"] or "")[:500], cuisine_str])
-    #             tokens = normalize_text(text)
-    #             for t in set(tokens):
-    #                 df_text[t] += 1
-    #             for iid in set(row["ingIds"] or []):
-    #                 df_ing[iid] += 1
-    #             total_docs += 1
-    #         skip += DEFAULT_BATCH
-    #         pages += 1
-    #         print(f"[PASS1] page={pages}, processed={skip} docs ...", flush=True)
+    with driver.session(**session_kwargs) as session:
+        skip, pages = 0, 0
+        while True:
+            rows = session.execute_read(fetch_recipes_paged, skip, DEFAULT_BATCH)
+            if not rows:
+                break
+            for row in rows:
+                cuisine_str = " ".join(row["cuisine"]) if isinstance(row["cuisine"], list) else str(row["cuisine"] or "")
+                text = " ".join([str(row["title"] or ""), " ".join(row["tags"] or []), str(row["instr"] or "")[:500], cuisine_str])
+                tokens = normalize_text(text)
+                for t in set(tokens):
+                    df_text[t] += 1
+                for iid in set(row["ingIds"] or []):
+                    df_ing[iid] += 1
+                total_docs += 1
+            skip += DEFAULT_BATCH
+            pages += 1
+            print(f"[PASS1] page={pages}, processed={skip} docs ...", flush=True)
 
-    # text_idf = {t: math.log(1.0 + (total_docs / max(df_text[t], 1))) for t in df_text}
-    # ing_idf = {t: math.log(1.0 + (total_docs / max(df_ing[t], 1))) for t in df_ing}
-    # print(f"[PASS1] Total docs = {total_docs}")
-    # print(f"[PASS1] Unique text terms = {len(text_idf)}, unique ingredients = {len(ing_idf)}")
+    text_idf = {t: math.log(1.0 + (total_docs / max(df_text[t], 1))) for t in df_text}
+    ing_idf = {t: math.log(1.0 + (total_docs / max(df_ing[t], 1))) for t in df_ing}
+    print(f"[PASS1] Total docs = {total_docs}")
+    print(f"[PASS1] Unique text terms = {len(text_idf)}, unique ingredients = {len(ing_idf)}")
 
-    # # -------- PASS2 --------
-    # print("\n[PASS2] Computing TF-IDF & updating Neo4j ...")
-    # with driver.session(**session_kwargs) as session:
-    #     skip, updated = 0, 0
-    #     while True:
-    #         rows = session.execute_read(fetch_recipes_paged, skip, DEFAULT_BATCH)
-    #         if not rows:
-    #             break
-    #         for row in rows:
-    #             rid = row["rid"]
-    #             cuisine_str = " ".join(row["cuisine"]) if isinstance(row["cuisine"], list) else str(row["cuisine"] or "")
-    #             text = " ".join([str(row["title"] or ""), " ".join(row["tags"] or []), str(row["instr"] or "")[:500], cuisine_str])
-    #             tokens = normalize_text(text)
-    #             tfidf = compute_tfidf(tokens, text_idf)
-    #             session.execute_write(store_recipe_vectors, rid, tfidf)
+    # -------- PASS2 --------
+    print("\n[PASS2] Computing TF-IDF & updating Neo4j ...")
+    with driver.session(**session_kwargs) as session:
+        skip, updated = 0, 0
+        while True:
+            rows = session.execute_read(fetch_recipes_paged, skip, DEFAULT_BATCH)
+            if not rows:
+                break
+            for row in rows:
+                rid = row["rid"]
+                cuisine_str = " ".join(row["cuisine"]) if isinstance(row["cuisine"], list) else str(row["cuisine"] or "")
+                text = " ".join([str(row["title"] or ""), " ".join(row["tags"] or []), str(row["instr"] or "")[:500], cuisine_str])
+                tokens = normalize_text(text)
+                tfidf = compute_tfidf(tokens, text_idf)
+                session.execute_write(store_recipe_vectors, rid, tfidf)
 
-    #             ing_set = list({x for x in (row["ingIds"] or []) if x})
-    #             if ing_set:
-    #                 pairs = [{"iid": iid, "w": float(ing_idf.get(iid, 0.0))} for iid in ing_set]
-    #                 session.execute_write(set_ing_edge_weights, rid, pairs)
+                ing_set = list({x for x in (row["ingIds"] or []) if x})
+                if ing_set:
+                    pairs = [{"iid": iid, "w": float(ing_idf.get(iid, 0.0))} for iid in ing_set]
+                    session.execute_write(set_ing_edge_weights, rid, pairs)
 
-    #             updated += 1
-    #         skip += DEFAULT_BATCH
-    #         print(f"[PASS2] updated={updated}/{total_docs} recipes ...", flush=True)
+                updated += 1
+            skip += DEFAULT_BATCH
+            print(f"[PASS2] updated={updated}/{total_docs} recipes ...", flush=True)
 
-    #     if df_ing:
-    #         stats = [{"iid": iid, "df": int(df_ing[iid]), "idf": float(ing_idf.get(iid, 0.0))} for iid in df_ing.keys()]
-    #         session.execute_write(store_ingredient_stats, total_docs, stats)
+        if df_ing:
+            stats = [{"iid": iid, "df": int(df_ing[iid]), "idf": float(ing_idf.get(iid, 0.0))} for iid in df_ing.keys()]
+            session.execute_write(store_ingredient_stats, total_docs, stats)
 
-    #     print("[PASS2] Building user profile vectors ...")
-    #     session.execute_write(build_user_profile)
+        print("[PASS2] Building user profile vectors ...")
+        session.execute_write(build_user_profile)
 
     # -------- PASS3 --------
     print("[PASS3] Building hybrid similarity graph ...")

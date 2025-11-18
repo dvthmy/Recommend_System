@@ -7,7 +7,7 @@ from ..db import get_session
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-BACKUP_PATH = "backend/data/users/user_backup.json"
+BACKUP_PATH = "data/users/user_backup.json"
 
 # ---------- Utility functions ----------
 def read_backup():
@@ -30,9 +30,9 @@ async def get_user_profile(user_id: str):
     """Get user profile — auto-restore if lost"""
     q = """
     MATCH (u:User {user_id:$user_id})
-    RETURN u.user_id AS user_id, u.username AS username, u.age AS age,
-           u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
-           u.max_cook_time AS max_cook_time, u.dietary_preferences AS dietary_preferences,
+    RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age,
+           u.gender AS gender, u.max_cook_time AS max_cook_time,
+           u.completed_onboarding AS completed_onboarding,
            u.created_at AS created_at, u.updated_at AS updated_at
     """
     with get_session() as s:
@@ -81,14 +81,17 @@ async def get_user_profile(user_id: str):
             s.run("""
                 CREATE (u:User {
                     user_id:$user_id,
-                    locale:$locale,
-                    skill_level:$skill_level,
                     max_cook_time:$max_cook_time,
-                    dietary_preferences:$dietary_preferences,
+                    completed_onboarding:$completed_onboarding,
                     created_at:$created_at,
                     updated_at:$updated_at
                 })
-            """, **profile)
+            """, 
+            user_id=profile.get("user_id"),
+            max_cook_time=profile.get("max_cook_time"),
+            completed_onboarding=profile.get("completed_onboarding", False),
+            created_at=profile.get("created_at"),
+            updated_at=profile.get("updated_at"))
 
             # 2️⃣ Restore ALLERGIC_TO
             for ing_id in relations.get("ALLERGIC_TO", []):
@@ -120,17 +123,14 @@ async def get_user_profile(user_id: str):
         now = datetime.now().isoformat()
         default_user = {
             "user_id": user_id,
-            "locale": "vi-VN",
-            "skill_level": "beginner",
             "max_cook_time": 60,
-            "dietary_preferences": [],
             "created_at": now,
             "updated_at": now
         }
         s.run("""
             CREATE (u:User {
-                user_id:$user_id, locale:$locale, skill_level:$skill_level,
-                max_cook_time:$max_cook_time, dietary_preferences:$dietary_preferences,
+                user_id:$user_id,
+                max_cook_time:$max_cook_time,
                 created_at:$created_at, updated_at:$updated_at
             })
         """, **default_user)
@@ -143,18 +143,29 @@ async def update_user_profile(user_id: str, update: UserProfileUpdate):
     now = datetime.now().isoformat()
     fields, params = [], {"user_id": user_id, "updated_at": now}
 
-    if update.locale is not None:
-        fields.append("u.locale = $locale")
-        params["locale"] = update.locale
-    if update.skill_level is not None:
-        fields.append("u.skill_level = $skill_level")
-        params["skill_level"] = update.skill_level
+    if update.username is not None:
+        fields.append("u.username = $username")
+        params["username"] = update.username
+    
+    if update.name is not None:
+        fields.append("u.name = $name")
+        params["name"] = update.name
+    
+    if update.age is not None:
+        fields.append("u.age = $age")
+        params["age"] = update.age
+    
+    if update.gender is not None:
+        fields.append("u.gender = $gender")
+        params["gender"] = update.gender
+
     if update.max_cook_time is not None:
         fields.append("u.max_cook_time = $max_cook_time")
         params["max_cook_time"] = update.max_cook_time
-    if update.dietary_preferences is not None:
-        fields.append("u.dietary_preferences = $dp")
-        params["dp"] = update.dietary_preferences
+    
+    if update.completed_onboarding is not None:
+        fields.append("u.completed_onboarding = $completed_onboarding")
+        params["completed_onboarding"] = update.completed_onboarding
 
     # Always update updated_at, even if no other fields are being updated
     if not fields:
@@ -166,9 +177,9 @@ async def update_user_profile(user_id: str, update: UserProfileUpdate):
     q = f"""
     MATCH (u:User {{user_id:$user_id}})
     SET {set_clause}
-    RETURN u.user_id AS user_id, u.username AS username, u.age AS age,
-           u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
-           u.max_cook_time AS max_cook_time, u.dietary_preferences AS dietary_preferences,
+    RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age,
+           u.gender AS gender, u.max_cook_time AS max_cook_time,
+           u.completed_onboarding AS completed_onboarding,
            u.created_at AS created_at, u.updated_at AS updated_at
     """
     with get_session() as s:
@@ -207,19 +218,17 @@ async def create_user():
     q = """
     CREATE (u:User {
         user_id:$uid,
-        locale:$loc,
-        skill_level:$lvl,
         max_cook_time:$max_time,
-        dietary_preferences:$dp,
+        completed_onboarding:$completed_onboarding,
         created_at:$now,
         updated_at:$now
     })
-    RETURN u.user_id AS user_id, u.locale AS locale, u.skill_level AS skill_level,
-           u.max_cook_time AS max_cook_time, u.dietary_preferences AS dietary_preferences,
+    RETURN u.user_id AS user_id, u.max_cook_time AS max_cook_time,
+           u.completed_onboarding AS completed_onboarding,
            u.created_at AS created_at, u.updated_at AS updated_at
     """
     with get_session() as s:
-        rec = s.run(q, uid=uid, loc="vi-VN", lvl="beginner", max_time=60, dp=[], now=now).single()
+        rec = s.run(q, uid=uid, max_time=60, completed_onboarding=False, now=now).single()
 
         # backup immediately
         data = read_backup()
@@ -288,8 +297,7 @@ async def add_user_allergies(user_id: str, request: AllergyUpdateRequest):
             profile_rec = s.run("""
                 MATCH (u:User {user_id:$uid})
                 RETURN u.user_id AS user_id, u.username AS username, u.age AS age,
-                       u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
-                       u.max_cook_time AS max_cook_time, u.dietary_preferences AS dietary_preferences,
+                       u.gender AS gender, u.max_cook_time AS max_cook_time,
                        u.created_at AS created_at, u.updated_at AS updated_at
             """, uid=user_id).single()
             if profile_rec:
@@ -432,8 +440,7 @@ async def add_user_favorite_cuisine(user_id: str, request: CuisinePreferenceRequ
             profile_rec = s.run("""
                 MATCH (u:User {user_id:$uid})
                 RETURN u.user_id AS user_id, u.username AS username, u.age AS age,
-                       u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
-                       u.max_cook_time AS max_cook_time, u.dietary_preferences AS dietary_preferences,
+                       u.gender AS gender, u.max_cook_time AS max_cook_time,
                        u.created_at AS created_at, u.updated_at AS updated_at
             """, uid=user_id).single()
             if profile_rec:

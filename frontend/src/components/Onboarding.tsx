@@ -27,6 +27,8 @@ const Onboarding: React.FC = () => {
   const [selectedAllergies, setSelectedAllergies] = useState<string[]>([]);
   const [availableIngredients, setAvailableIngredients] = useState<AvailableIngredient[]>([]);
   const [ingredientSearch, setIngredientSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<AvailableIngredient[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isMealTypeDropdownOpen, setIsMealTypeDropdownOpen] = useState(false);
   const mealTypeDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -36,9 +38,48 @@ const Onboarding: React.FC = () => {
     if (userId) {
       loadUserAllergies(userId);
       loadUserFavoriteCuisines(userId);
+    } else {
+      // If no userId, ensure favoriteCuisines is null so the section shows
+      // This is already the default state, but we make it explicit
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Search ingredients when user types
+  useEffect(() => {
+    if (!ingredientSearch.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await apiService.searchIngredients({
+          query: ingredientSearch.trim(),
+          limit: 20,
+          offset: 0
+        });
+        
+        if (response.data && response.data.ingredients) {
+          const results: AvailableIngredient[] = response.data.ingredients.map(ing => ({
+            id: ing.ingredient_id,
+            name: ing.canonical_name || ing.name || ''
+          }));
+          setSearchResults(results);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (err) {
+        console.error('Failed to search ingredients:', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timeoutId);
+  }, [ingredientSearch]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -70,18 +111,21 @@ const Onboarding: React.FC = () => {
 
   // Data constants
   const cuisines = [
-    { id: 'vietnamese', name: 'Vietnamese' },
-    { id: 'chinese', name: 'Chinese' },
-    { id: 'japanese', name: 'Japanese' },
-    { id: 'korean', name: 'Korean' },
-    { id: 'thai', name: 'Thai' },
-    { id: 'indian', name: 'Indian' },
-    { id: 'italian', name: 'Italian' },
-    { id: 'french', name: 'French' },
-    { id: 'mexican', name: 'Mexican' },
     { id: 'american', name: 'American' },
+    { id: 'chinese', name: 'Chinese' },
+    { id: 'italian', name: 'Italian' },
+    { id: 'mexican', name: 'Mexican' },
+    { id: 'french', name: 'French' },
+    { id: 'vietnamese', name: 'Vietnamese' },
+    { id: 'japanese', name: 'Japanese' },
+    { id: 'indian', name: 'Indian' },
     { id: 'mediterranean', name: 'Mediterranean' },
-    { id: 'middle_eastern', name: 'Middle Eastern' }
+    { id: 'european', name: 'European' },
+    { id: 'korean', name: 'Korean' },
+    { id: 'british', name: 'British' },
+    { id: 'thai', name: 'Thai' },
+    { id: 'caribbean', name: 'Caribbean' },
+    { id: 'no_preference', name: 'No Preference' }
   ];
 
   const mealTypes = [
@@ -143,7 +187,7 @@ const Onboarding: React.FC = () => {
       id: 'cuisines',
       title: 'Favorite Cuisines', 
       description: 'Which country\'s cuisine do you prefer?',
-      subtitle: 'Select up to 5 countries'
+      subtitle: 'Select up to 3 countries'
     },
     { 
       id: 'meals',
@@ -161,23 +205,47 @@ const Onboarding: React.FC = () => {
 
   // Handlers
   const handleAddAllergy = (ingredientId: string) => {
-    if (!selectedAllergies.includes(ingredientId)) {
-      setSelectedAllergies([...selectedAllergies, ingredientId]);
-      setIngredientSearch('');
-    }
+    // Use functional update to ensure we have the latest state
+    setSelectedAllergies(prev => {
+      if (prev.includes(ingredientId)) {
+        return prev; // Already selected, don't add again
+      }
+      const newAllergies = [...prev, ingredientId];
+      
+      // Find ingredient data from search results or available ingredients
+      const ingredientData = searchResults.find(ing => ing.id === ingredientId) 
+        || availableIngredients.find(ing => ing.id === ingredientId);
+      
+      if (ingredientData) {
+        // Add to availableIngredients if not already there
+        setAvailableIngredients(prevAvail => {
+          if (!prevAvail.find(ing => ing.id === ingredientId)) {
+            return [...prevAvail, ingredientData];
+          }
+          return prevAvail;
+        });
+      }
+      
+      return newAllergies;
+    });
+    setIngredientSearch('');
   };
 
   const handleRemoveAllergy = (ingredientId: string) => {
-    setSelectedAllergies(selectedAllergies.filter(id => id !== ingredientId));
+    // Remove from state immediately using functional update
+    setSelectedAllergies(prev => prev.filter(id => id !== ingredientId));
   };
 
-  // Show all ingredients that match search, including selected ones
-  const filteredIngredients = availableIngredients.filter(ingredient =>
-    ingredient.name.toLowerCase().includes(ingredientSearch.toLowerCase())
-  );
+  // Use search results if available, otherwise filter from availableIngredients
+  const filteredIngredients = ingredientSearch.trim() && searchResults.length > 0
+    ? searchResults
+    : availableIngredients.filter(ingredient =>
+        ingredient.name.toLowerCase().includes(ingredientSearch.toLowerCase())
+      );
 
-  // Check if search term matches any existing ingredient
-  const exactMatch = availableIngredients.find(
+  // Check if search term matches any existing ingredient (from search results or available)
+  const allIngredients = [...searchResults, ...availableIngredients];
+  const exactMatch = allIngredients.find(
     ing => ing.name.toLowerCase() === ingredientSearch.toLowerCase().trim()
   );
 
@@ -205,12 +273,45 @@ const Onboarding: React.FC = () => {
   };
 
   const handleCuisineToggle = (cuisineId: string) => {
-    setPreferences(prev => ({
-      ...prev,
-      favoriteCuisines: prev.favoriteCuisines.includes(cuisineId)
-        ? prev.favoriteCuisines.filter(id => id !== cuisineId)
-        : prev.favoriteCuisines.length < 5 ? [...prev.favoriteCuisines, cuisineId] : prev.favoriteCuisines
-    }));
+    setPreferences(prev => {
+      // If "No Preference" is selected
+      if (cuisineId === 'no_preference') {
+        // If already selected, deselect it
+        if (prev.favoriteCuisines.includes('no_preference')) {
+          return {
+            ...prev,
+            favoriteCuisines: []
+          };
+        }
+        // Otherwise, select only "No Preference" and clear others
+        return {
+          ...prev,
+          favoriteCuisines: ['no_preference']
+        };
+      }
+      
+      // If "No Preference" is already selected, remove it and select the clicked cuisine
+      if (prev.favoriteCuisines.includes('no_preference')) {
+        return {
+          ...prev,
+          favoriteCuisines: [cuisineId]
+        };
+      }
+      
+      // Toggle the selected cuisine
+      if (prev.favoriteCuisines.includes(cuisineId)) {
+        return {
+          ...prev,
+          favoriteCuisines: prev.favoriteCuisines.filter(id => id !== cuisineId)
+        };
+      } else {
+        // Add cuisine if under limit (3)
+        return {
+          ...prev,
+          favoriteCuisines: prev.favoriteCuisines.length < 3 ? [...prev.favoriteCuisines, cuisineId] : prev.favoriteCuisines
+        };
+      }
+    });
   };
 
   const handleMealTypeSelect = (mealTypeId: string) => {
@@ -238,7 +339,8 @@ const Onboarding: React.FC = () => {
         locale: 'vi-VN',
         skill_level: 'intermediate',
         max_cook_time: maxCookTime,
-        dietary_preferences: []
+        dietary_preferences: [],
+        completed_onboarding: true  // Mark onboarding as completed in database
       };
 
       await updateUserProfile(user.user_id, profileUpdate);
@@ -249,7 +351,10 @@ const Onboarding: React.FC = () => {
       }
 
       const hasExistingCuisines = favoriteCuisines?.favorite_cuisines && favoriteCuisines.favorite_cuisines.length > 0;
-      if (preferences.favoriteCuisines.length > 0 && !hasExistingCuisines) {
+      // Only add cuisines if "No Preference" is not selected
+      if (preferences.favoriteCuisines.length > 0 && 
+          !preferences.favoriteCuisines.includes('no_preference') && 
+          !hasExistingCuisines) {
         for (const cuisineId of preferences.favoriteCuisines) {
           const cuisineName = cuisines.find(c => c.id === cuisineId)?.name;
           if (cuisineName) {
@@ -260,6 +365,7 @@ const Onboarding: React.FC = () => {
           }
         }
       }
+      // If "No Preference" is selected, we don't add any cuisines (returns None/null)
       
       await loadUserAllergies(user.user_id);
       await loadUserFavoriteCuisines(user.user_id);
@@ -278,22 +384,16 @@ const Onboarding: React.FC = () => {
         completedOnboarding: true
       };
       localStorage.setItem('userPreferences', JSON.stringify(finalPreferences));
-      navigate('/upload');
+      navigate('/suggestions');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const canSubmit = () => {
-    const hasExistingAllergies = allergies?.allergies && allergies.allergies.length > 0;
-    const hasExistingCuisines = favoriteCuisines?.favorite_cuisines && favoriteCuisines.favorite_cuisines.length > 0;
-    
-    const allergiesValid = hasExistingAllergies || selectedAllergies.length >= 0;
-    const cuisinesValid = hasExistingCuisines || preferences.favoriteCuisines.length > 0;
-    
-    return allergiesValid && 
-           cuisinesValid &&
-           preferences.preferredMealTypes.length > 0 && 
+    // User can skip allergies and cuisines (empty is valid)
+    // Only check required fields: meal type and cooking time
+    return preferences.preferredMealTypes.length > 0 && 
            preferences.cookingTimePreference !== '';
   };
 
@@ -313,7 +413,8 @@ const Onboarding: React.FC = () => {
           )}
 
           {/* Ingredient Allergies Section */}
-          {(!allergies || !allergies.allergies || allergies.allergies.length === 0) && (
+          {/* Only show if user hasn't completed onboarding yet */}
+          {!user?.completed_onboarding && (
             <div className="onboarding-section">
               <div className="section-header">
                 <h2>What are your ingredient allergies?</h2>
@@ -337,9 +438,15 @@ const Onboarding: React.FC = () => {
                       }}
                       className="allergy-search-input"
                     />
-                  {ingredientSearch && (filteredIngredients.length > 0 || canAddNewIngredient) && (
+                  {ingredientSearch && (filteredIngredients.length > 0 || canAddNewIngredient || isSearching) && (
                     <div className="allergy-dropdown">
-                      {filteredIngredients.slice(0, 10).map((ingredient: AvailableIngredient) => {
+                      {isSearching && (
+                        <div className="allergy-dropdown-item" style={{ textAlign: 'center', color: '#666' }}>
+                          Searching...
+                        </div>
+                      )}
+                      {!isSearching && filteredIngredients.slice(0, 10).map((ingredient: AvailableIngredient) => {
+                        // Only show checkmark if ingredient is actually in selectedAllergies
                         const isSelected = selectedAllergies.includes(ingredient.id);
                         return (
                           <div
@@ -376,7 +483,8 @@ const Onboarding: React.FC = () => {
                   {selectedAllergies.length > 0 && (
                     <div className="allergy-tags-container">
                       {selectedAllergies.map(ingredientId => {
-                        const ingredient = availableIngredients.find(ing => ing.id === ingredientId);
+                        const ingredient = availableIngredients.find(ing => ing.id === ingredientId)
+                          || searchResults.find(ing => ing.id === ingredientId);
                         return ingredient ? (
                           <span key={ingredientId} className="allergy-tag">
                             {ingredient.name}
@@ -397,7 +505,8 @@ const Onboarding: React.FC = () => {
           )}
 
           {/* Favorite Cuisines Section */}
-          {(!favoriteCuisines || !favoriteCuisines.favorite_cuisines || favoriteCuisines.favorite_cuisines.length === 0) && (
+          {/* Only show if user hasn't completed onboarding yet */}
+          {!user?.completed_onboarding && (
             <div className="onboarding-section">
               <div className="section-header">
                 <h2>{sections[0].title}</h2>
@@ -422,7 +531,9 @@ const Onboarding: React.FC = () => {
                 ))}
               </div>
               <p className="selection-counter">
-                Selected {preferences.favoriteCuisines.length}/5 countries
+                {preferences.favoriteCuisines.includes('no_preference') 
+                  ? 'No Preference selected' 
+                  : `Selected ${preferences.favoriteCuisines.length}/3 countries`}
               </p>
             </div>
           )}

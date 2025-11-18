@@ -36,6 +36,7 @@ async def signup(request: SignUpRequest):
         CREATE (u:User {
             user_id: $uid,
             username: $username,
+            name: $name,
             password_hash: $password_hash,
             age: $age,
             gender: $gender,
@@ -43,12 +44,14 @@ async def signup(request: SignUpRequest):
             skill_level: $skill_level,
             max_cook_time: $max_time,
             dietary_preferences: $dp,
+            completed_onboarding: $completed_onboarding,
             created_at: $now,
             updated_at: $now
         })
-        RETURN u.user_id AS user_id, u.username AS username, u.age AS age, 
+        RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age, 
                u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
                u.max_cook_time AS max_cook_time, u.dietary_preferences AS dietary_preferences,
+               u.completed_onboarding AS completed_onboarding,
                u.created_at AS created_at, u.updated_at AS updated_at
         """
         
@@ -56,11 +59,13 @@ async def signup(request: SignUpRequest):
             create_q,
             uid=uid,
             username=request.username,
+            name=request.name,
             password_hash=password_hash,
             age=request.age,
             gender=request.gender,
             locale="vi-VN",
             skill_level="beginner",
+            completed_onboarding=False,
             max_time=60,
             dp=[],
             now=now
@@ -88,7 +93,7 @@ async def signin(request: SignInRequest):
     
     q = """
     MATCH (u:User {username: $username, password_hash: $password_hash})
-    RETURN u.user_id AS user_id, u.username AS username, u.age AS age,
+    RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age,
            u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
            u.max_cook_time AS max_cook_time, u.dietary_preferences AS dietary_preferences,
            u.created_at AS created_at, u.updated_at AS updated_at

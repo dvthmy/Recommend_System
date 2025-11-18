@@ -61,11 +61,9 @@ export const UserProvider: React.FC<Props> = ({ children }) => {
       const response = await apiService.getUserProfile(userId);
 
       if (response.data) {
-        // Only update if user_id changed or if user doesn't exist
-        if (!user || user.user_id !== response.data.user_id) {
-          setUser(response.data);
-          localStorage.setItem("userId", response.data.user_id);
-        }
+        // Always update user data to ensure latest changes are reflected
+        setUser(response.data);
+        localStorage.setItem("userId", response.data.user_id);
         return true;
       } else {
         throw new Error(response.error || "User not found");
@@ -162,9 +160,14 @@ export const UserProvider: React.FC<Props> = ({ children }) => {
         if (!favoriteCuisines || favoriteCuisines.favorite_cuisines?.length !== res.data.favorite_cuisines?.length) {
           setFavoriteCuisines(res.data);
         }
+      } else if (res.error) {
+        // If API returns error (e.g., 404), set to null so onboarding shows the section
+        setFavoriteCuisines(null);
       }
     } catch (err) {
       console.error("Failed to load cuisines:", err);
+      // If error occurs, set to null so onboarding shows the section
+      setFavoriteCuisines(null);
     }
   };
 

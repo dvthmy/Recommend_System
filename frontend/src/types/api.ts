@@ -10,12 +10,14 @@ export interface ApiResponse<T> {
 export interface UserProfile {
   user_id: string;
   username?: string;
+  name?: string;
   age?: number;
   gender?: string;
   locale?: string;
   skill_level?: string;
   max_cook_time?: number;
   dietary_preferences?: string[];
+  completed_onboarding?: boolean;  // Track if user completed onboarding
   created_at?: string;
   updated_at?: string;
   access_token?: string;
@@ -23,10 +25,15 @@ export interface UserProfile {
 }
 
 export interface UserProfileUpdate {
+  username?: string;
+  name?: string;
+  age?: number;
+  gender?: string;
   locale?: string;
   skill_level?: string;
   max_cook_time?: number;
   dietary_preferences?: string[];
+  completed_onboarding?: boolean;  // Track if user completed onboarding
 }
 
 // Allergy and Dislike Types
@@ -110,8 +117,10 @@ export interface RecipeRecommendation {
 export interface RecommendationRequest {
   user_id?: string;
   ingredient_ids?: string[];
+  ingredient_names?: string[];
   max_cook_time?: number;
   limit?: number;
+  min_match_ratio?: number;
 }
 
 export interface RecommendationResponse {
@@ -277,7 +286,7 @@ export interface IngredientSearchRequest {
 }
 
 export interface IngredientSearchResponse {
-  ingredients: IngredientInfo[];
+  ingredients: IngredientDetail[];
   total: number;
   has_more: boolean;
 }
