@@ -41,7 +41,6 @@ frontend/node_modules/
 backend/data/ingredients/*.json
 backend/data/process/*.json
 backend/backend/data/users/*.json
-
 # Logs
 *.log
 backend/logs/*.log
@@ -71,3 +70,5 @@ backend/data/ingredients/*.txt
 *.backup
 *_backup.*
 
+# Large Cypher import files
+backend/db/neo4j/recipes_import.cypher
