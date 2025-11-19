@@ -1,5 +1,5 @@
 // Neo4j schema for Food Recommendation System
-// Run with: :source db/neo4j/schema.cypher (from Neo4j Browser) or via neo4j-admin cypher-shell
+// Run with: :source backend/neo4j/schema.cypher (from Neo4j Browser) or via neo4j-admin cypher-shell
 
 //========================
 // Constraints (IDs)

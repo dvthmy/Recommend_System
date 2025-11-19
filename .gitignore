@@ -71,4 +71,5 @@ backend/data/ingredients/*.txt
 *_backup.*
 
 # Large Cypher import files
-backend/db/neo4j/recipes_import.cypher
+backend/neo4j/recipes_import.cypher
+backend/neo4j/*_import.cypher
