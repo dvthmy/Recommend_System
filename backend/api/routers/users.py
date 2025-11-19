@@ -32,6 +32,7 @@ async def get_user_profile(user_id: str):
     MATCH (u:User {user_id:$user_id})
     RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age,
            u.gender AS gender, u.max_cook_time AS max_cook_time,
+           coalesce(u.dietary_preferences, []) AS dietary_preferences,
            u.completed_onboarding AS completed_onboarding,
            u.created_at AS created_at, u.updated_at AS updated_at
     """
@@ -163,6 +164,10 @@ async def update_user_profile(user_id: str, update: UserProfileUpdate):
         fields.append("u.max_cook_time = $max_cook_time")
         params["max_cook_time"] = update.max_cook_time
     
+    if update.dietary_preferences is not None:
+        fields.append("u.dietary_preferences = $dietary_preferences")
+        params["dietary_preferences"] = update.dietary_preferences
+    
     if update.completed_onboarding is not None:
         fields.append("u.completed_onboarding = $completed_onboarding")
         params["completed_onboarding"] = update.completed_onboarding
@@ -179,6 +184,7 @@ async def update_user_profile(user_id: str, update: UserProfileUpdate):
     SET {set_clause}
     RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age,
            u.gender AS gender, u.max_cook_time AS max_cook_time,
+           coalesce(u.dietary_preferences, []) AS dietary_preferences,
            u.completed_onboarding AS completed_onboarding,
            u.created_at AS created_at, u.updated_at AS updated_at
     """

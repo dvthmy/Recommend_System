@@ -133,23 +133,38 @@
   object-fit: cover;
 }
 
-.heart-icon {
+.history-heart-btn {
   position: absolute;
   top: var(--spacing-sm);
   right: var(--spacing-sm);
-  width: 32px;
-  height: 32px;
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  z-index: 10;
+  padding: 0;
 }
 
-.heart-icon svg {
-  width: 18px;
-  height: 18px;
+.history-heart-btn:hover {
+  color: var(--color-primary);
+  transform: scale(1.1);
+}
+
+.history-heart-btn.liked {
+  color: var(--color-primary);
+}
+
+.history-heart-btn .favorite-icon {
+  width: 20px;
+  height: 20px;
 }
 
 .recipe-info {
@@ -173,6 +188,74 @@
   font-size: var(--text-sm);
   color: var(--text-secondary);
   margin: 0;
+}
+
+.recipe-meta {
+  margin-top: var(--spacing-xs);
+}
+
+.recipe-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.view-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.viewed-badge {
+  background-color: #f0f0f0;
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.liked-badge {
+  background-color: #ffe5e5;
+  color: var(--color-primary);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.rated-badge {
+  background-color: #fff4e5;
+  color: var(--color-warning);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.heart-icon-small,
+.star-icon-small {
+  width: 16px;
+  height: 16px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.star-icon-small {
+  color: var(--color-warning);
+}
+
+.meta-separator {
+  color: var(--text-secondary);
+  margin: 0 4px;
+}
+
+.time-ago {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 
 /* Empty State */

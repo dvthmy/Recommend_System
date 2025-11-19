@@ -22,6 +22,7 @@ interface UserContextType {
   loadUserFavoriteCuisines: (userId: string) => Promise<void>;
   initializeUser: () => Promise<void>;
   clearError: () => void;
+  logout: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -82,24 +83,13 @@ export const UserProvider: React.FC<Props> = ({ children }) => {
         setError("User session expired. Please sign in again.");
         return false;
       } else {
-        // No token - this is a guest user, auto-create is allowed
-        console.warn("⚠️ Guest user not found in DB, auto-creating...");
-        try {
-          const created = await apiService.createUser();
-          if (created.data) {
-            setUser(created.data);
-            localStorage.setItem("userId", created.data.user_id);
-            return true;
-          } else {
-            console.error("Failed to create user:", created.error);
-            setError(created.error || "Failed to create new user");
-            return false;
-          }
-        } catch (createErr) {
-          console.error("Error creating user:", createErr);
-          setError("Failed to create new user. Please try again.");
-          return false;
-        }
+        // No token - this could be a guest user, but don't auto-create
+        // Guest user should only be created when user explicitly clicks "Continue as Guest"
+        // Return false so caller knows user doesn't exist yet
+        console.log("⚠️ User not found and no token - user needs to sign in or continue as guest");
+        setUser(null);
+        localStorage.removeItem("userId"); // Clear invalid userId
+        return false;
       }
     } finally {
       setIsLoading(false);
@@ -234,6 +224,29 @@ export const UserProvider: React.FC<Props> = ({ children }) => {
     initializeUser();
   }, []);
 
+  // =====================
+  // 🔹 Logout
+  // =====================
+  const logout = () => {
+    // Clear all localStorage data
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userPreferences');
+    localStorage.removeItem('uploadedIngredients');
+    localStorage.removeItem('likedRecipes');
+    localStorage.removeItem('guestCompletedOnboarding'); // Clear guest completion flag
+    localStorage.removeItem('surveyCompletedInSession'); // Clear session survey completion flag
+    
+    // Clear all state
+    setUser(null);
+    setAllergies(null);
+    setDislikes(null);
+    setFavoriteCuisines(null);
+    setError(null);
+    
+    console.log('User logged out successfully');
+  };
+
   const value: UserContextType = {
     user,
     allergies,
@@ -249,6 +262,7 @@ export const UserProvider: React.FC<Props> = ({ children }) => {
     loadUserFavoriteCuisines,
     initializeUser,
     clearError,
+    logout,
   };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

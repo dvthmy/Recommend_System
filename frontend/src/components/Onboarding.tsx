@@ -12,7 +12,12 @@ interface AvailableIngredient {
 
 const Onboarding: React.FC = () => {
   const navigate = useNavigate();
-  const { user, updateUserProfile, loadUserAllergies, loadUserFavoriteCuisines, allergies, favoriteCuisines, error } = useUser();
+  const { user, updateUserProfile, loadUserProfile, loadUserAllergies, loadUserFavoriteCuisines, allergies, favoriteCuisines, error } = useUser();
+  
+  // Determine if user has completed onboarding before
+  // If completed_onboarding is true, user has done onboarding before → show only 2 questions (Meal Types, Cooking Time)
+  // If completed_onboarding is false/undefined, user is new (guest or first-time login) → show 4 questions (Allergies, Favorite Cuisines, Meal Types, Cooking Time)
+  const hasCompletedOnboardingBefore = user?.completed_onboarding === true;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>({
     favoriteCuisines: [],
@@ -31,11 +36,20 @@ const Onboarding: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isMealTypeDropdownOpen, setIsMealTypeDropdownOpen] = useState(false);
   const mealTypeDropdownRef = useRef<HTMLDivElement>(null);
+  const hasLoadedDataRef = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple API calls if component re-renders
+    if (hasLoadedDataRef.current) {
+      return;
+    }
+    
+    hasLoadedDataRef.current = true;
     loadAvailableIngredients();
     const userId = localStorage.getItem('userId');
     if (userId) {
+      // Load full user profile to get completed_onboarding status
+      loadUserProfile(userId);
       loadUserAllergies(userId);
       loadUserFavoriteCuisines(userId);
     } else {
@@ -335,11 +349,15 @@ const Onboarding: React.FC = () => {
         option => option.id === preferences.cookingTimePreference
       )?.minutes;
 
+      // Get meal type name from preferences
+      const selectedMealType = preferences.preferredMealTypes[0];
+      const mealTypeName = mealTypes.find(m => m.id === selectedMealType)?.name;
+      
       const profileUpdate = {
         locale: 'vi-VN',
         skill_level: 'intermediate',
         max_cook_time: maxCookTime,
-        dietary_preferences: [],
+        dietary_preferences: mealTypeName ? [mealTypeName] : [],  // Store meal type in dietary_preferences
         completed_onboarding: true  // Mark onboarding as completed in database
       };
 
@@ -369,21 +387,63 @@ const Onboarding: React.FC = () => {
       
       await loadUserAllergies(user.user_id);
       await loadUserFavoriteCuisines(user.user_id);
+      
+      // Check if user is guest
+      // Guest = no access token OR (has user object but no username)
+      const hasAccessToken = !!localStorage.getItem('access_token');
+      const hasUsername = !!user?.username;
+      const isGuest = !hasAccessToken || (user && !hasUsername);
+      
+      // Only update completed_onboarding for registered users, not guests
+      if (!isGuest) {
+        // Reload user profile to get updated completed_onboarding status
+        await loadUserProfile(user.user_id);
+      }
 
-      const finalPreferences = {
-        ...preferences,
-        completedOnboarding: true
-      };
-      localStorage.setItem('userPreferences', JSON.stringify(finalPreferences));
+      // Save completion status
+      if (!isGuest) {
+        // Registered users: save to userPreferences
+        const finalPreferences = {
+          ...preferences,
+          completedOnboarding: true
+        };
+        localStorage.setItem('userPreferences', JSON.stringify(finalPreferences));
+      } else {
+        // Guest users: save session-based completion flag (will be cleared on logout/refresh)
+        localStorage.setItem('guestCompletedOnboarding', 'true');
+      }
+      
+      // Set flag to indicate survey was completed in this session
+      // This allows FoodSuggestions to show the add ingredients page
+      localStorage.setItem('surveyCompletedInSession', 'true');
       
       navigate('/suggestions');
     } catch (err) {
       console.error('Failed to save user preferences:', err);
-      const finalPreferences = {
-        ...preferences,
-        completedOnboarding: true
-      };
-      localStorage.setItem('userPreferences', JSON.stringify(finalPreferences));
+      
+      // Check if user is guest
+      // Guest = no access token OR (has user object but no username)
+      const hasAccessToken = !!localStorage.getItem('access_token');
+      const hasUsername = !!user?.username;
+      const isGuest = !hasAccessToken || (user && !hasUsername);
+      
+      // Save completion status
+      if (!isGuest) {
+        // Registered users: save to userPreferences
+        const finalPreferences = {
+          ...preferences,
+          completedOnboarding: true
+        };
+        localStorage.setItem('userPreferences', JSON.stringify(finalPreferences));
+      } else {
+        // Guest users: save session-based completion flag (will be cleared on logout/refresh)
+        localStorage.setItem('guestCompletedOnboarding', 'true');
+      }
+      
+      // Set flag to indicate survey was completed in this session
+      // This allows FoodSuggestions to show the add ingredients page
+      localStorage.setItem('surveyCompletedInSession', 'true');
+      
       navigate('/suggestions');
     } finally {
       setIsSubmitting(false);
@@ -413,8 +473,8 @@ const Onboarding: React.FC = () => {
           )}
 
           {/* Ingredient Allergies Section */}
-          {/* Only show if user hasn't completed onboarding yet */}
-          {!user?.completed_onboarding && (
+          {/* Show if user hasn't completed onboarding before (guest or first-time login) */}
+          {!hasCompletedOnboardingBefore && (
             <div className="onboarding-section">
               <div className="section-header">
                 <h2>What are your ingredient allergies?</h2>
@@ -505,8 +565,8 @@ const Onboarding: React.FC = () => {
           )}
 
           {/* Favorite Cuisines Section */}
-          {/* Only show if user hasn't completed onboarding yet */}
-          {!user?.completed_onboarding && (
+          {/* Show if user hasn't completed onboarding before (guest or first-time login) */}
+          {!hasCompletedOnboardingBefore && (
             <div className="onboarding-section">
               <div className="section-header">
                 <h2>{sections[0].title}</h2>

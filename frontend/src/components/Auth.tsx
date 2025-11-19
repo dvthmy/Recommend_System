@@ -7,7 +7,7 @@ import './Auth.css';
 const Auth: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUser } = useUser();
+  const { setUser, loadUserProfile } = useUser();
   const [activeTab, setActiveTab] = useState<'signup' | 'signin'>('signup');
 
   // Set active tab based on URL
@@ -133,6 +133,8 @@ const Auth: React.FC = () => {
         if (response.data.access_token) {
           localStorage.setItem('access_token', response.data.access_token);
         }
+        // Load full user profile from database to get completed_onboarding and other fields
+        await loadUserProfile(response.data.user_id);
         navigate('/');
       } else {
         setError(response.error || 'Sign in failed');

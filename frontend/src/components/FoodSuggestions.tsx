@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Clock, Star, Users, Heart } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/api';
 import { RecipeRecommendation, RecommendationRequest } from '../types/api';
 import { FoodSuggestion } from '../types';
+import Onboarding from './Onboarding';
 import './FoodSuggestions.css';
 
 interface AvailableIngredient {
@@ -13,7 +15,7 @@ interface AvailableIngredient {
 
 const FoodSuggestions: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useUser();
+  const { user, isLoading, loadUserProfile, loadUserAllergies, loadUserFavoriteCuisines, allergies, favoriteCuisines } = useUser();
   const [suggestions, setSuggestions] = useState<FoodSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,14 +37,25 @@ const FoodSuggestions: React.FC = () => {
   const [detecting, setDetecting] = useState(false);
   const [detectionMessage, setDetectionMessage] = useState<string | null>(null);
   
-  const [ratingModal, setRatingModal] = useState<{ isOpen: boolean; foodId: string | null }>({
-    isOpen: false,
-    foodId: null
-  });
-  const [userRating, setUserRating] = useState(0);
+  // Liked recipes state
+  const [likedRecipes, setLikedRecipes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadAvailableIngredients();
+    loadLikedRecipes();
+    
+    // Load user profile, allergies, and favorite cuisines if user is authenticated
+    const userId = localStorage.getItem('userId');
+    const hasAccessToken = !!localStorage.getItem('access_token');
+    if (userId && hasAccessToken) {
+      if (!user || user.completed_onboarding === undefined) {
+        loadUserProfile(userId);
+      }
+      // Load allergies and favorite cuisines for recommendations
+      loadUserAllergies(userId);
+      loadUserFavoriteCuisines(userId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load ingredients from localStorage after availableIngredients are loaded
@@ -141,6 +154,91 @@ const FoodSuggestions: React.FC = () => {
     }
   };
 
+  const loadLikedRecipes = async () => {
+    // For guest users, load from localStorage
+    const isGuest = !localStorage.getItem('access_token');
+    if (isGuest) {
+      try {
+        const liked = JSON.parse(localStorage.getItem('likedRecipes') || '[]');
+        setLikedRecipes(new Set(liked));
+      } catch (err) {
+        console.error('Failed to load liked recipes from localStorage:', err);
+      }
+      return;
+    }
+
+    // For registered users, load from backend
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    try {
+      const response = await apiService.getUserInteractions(userId, 'like', 100, 0);
+      if (response.data && response.data.interactions) {
+        const liked = new Set(response.data.interactions.map((interaction: any) => interaction.recipe_id));
+        setLikedRecipes(liked);
+      }
+    } catch (err) {
+      console.error('Failed to load liked recipes:', err);
+    }
+  };
+
+  const toggleLike = async (recipeId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent double-click from triggering
+    
+    const isGuest = !localStorage.getItem('access_token');
+    const isLiked = likedRecipes.has(recipeId);
+
+    if (isGuest) {
+      // For guest users, save to localStorage
+      const newLiked = new Set(likedRecipes);
+      if (isLiked) {
+        newLiked.delete(recipeId);
+      } else {
+        newLiked.add(recipeId);
+      }
+      setLikedRecipes(newLiked);
+      localStorage.setItem('likedRecipes', JSON.stringify(Array.from(newLiked)));
+      return;
+    }
+
+    // For registered users, update backend
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert('Please sign in to like recipes.');
+      return;
+    }
+
+    // Optimistic update: update UI immediately
+        const newLiked = new Set(likedRecipes);
+    if (isLiked) {
+        newLiked.delete(recipeId);
+      } else {
+      newLiked.add(recipeId);
+    }
+    setLikedRecipes(newLiked);
+
+    try {
+      // Backend will toggle like/unlike automatically
+        await apiService.recordUserInteraction(userId, {
+          recipe_id: recipeId,
+          event_type: 'like'
+        });
+      
+      // Reload liked recipes from backend to sync
+      await loadLikedRecipes();
+      
+      // Dispatch event to notify Profile component to reload stats
+      window.dispatchEvent(new CustomEvent('interactionUpdated', { 
+        detail: { type: 'like', recipeId, isLiked: !isLiked } 
+      }));
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+      // Revert optimistic update on error
+      setLikedRecipes(likedRecipes);
+      alert('Failed to update like. Please try again.');
+    }
+  };
+
   const loadRecommendations = async () => {
     setHasRequestedSuggestions(true);
     setLoading(true);
@@ -188,11 +286,28 @@ const FoodSuggestions: React.FC = () => {
         })
         .filter(name => name.length > 0);
 
+      // Get meal type from user preferences (stored in dietary_preferences)
+      const mealType = user.dietary_preferences && user.dietary_preferences.length > 0 
+        ? user.dietary_preferences[0] 
+        : undefined;
+
+      // Get preferred cuisines from user's favorite cuisines
+      const preferredCuisines = favoriteCuisines?.favorite_cuisines 
+        ? favoriteCuisines.favorite_cuisines.map((c: any) => c.cuisine_name)
+        : undefined;
+
+      // Get allergies (for logging - backend will handle exclusion automatically via user_id)
+      const userAllergies = allergies?.allergies 
+        ? allergies.allergies.map((a: any) => a.ingredient_name || a.ingredient_id)
+        : [];
+
       const request: RecommendationRequest = {
         user_id: user.user_id,
         ingredient_ids: ingredientIds.length > 0 ? ingredientIds : undefined,
         ingredient_names: ingredientNames.length > 0 ? ingredientNames : undefined,
         max_cook_time: user.max_cook_time,
+        recipe_category: mealType,  // Use meal type from user preferences
+        preferred_cuisines: preferredCuisines && preferredCuisines.length > 0 ? preferredCuisines : undefined,
         limit: 10,
         min_match_ratio: 0.3  // Lower threshold to get more results
       };
@@ -204,6 +319,11 @@ const FoodSuggestions: React.FC = () => {
         ingredient_ids_count: request.ingredient_ids?.length || 0,
         ingredient_names_count: request.ingredient_names?.length || 0,
         max_cook_time: request.max_cook_time,
+        recipe_category: request.recipe_category,
+        preferred_cuisines: request.preferred_cuisines,
+        preferred_cuisines_count: request.preferred_cuisines?.length || 0,
+        allergies: userAllergies,
+        allergies_count: userAllergies.length,
         limit: request.limit
       });
 
@@ -241,7 +361,10 @@ const FoodSuggestions: React.FC = () => {
               (Array.isArray((recipe as any).image_urls) && (recipe as any).image_urls.length > 0
                 ? (recipe as any).image_urls[0]
                 : 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop')) as string,
-            matchScore: Math.round(Number(rawScore))
+            matchScore: Math.round(Number(rawScore)),
+            servings: (recipe as any).servings,
+            ratingValue: (recipe as any).rating_value,
+            ratingCount: (recipe as any).rating_count ?? (recipe as any).review_count
           };
           });
           
@@ -272,7 +395,10 @@ const FoodSuggestions: React.FC = () => {
         cuisine: 'Vietnamese',
         mealType: ['Lunch', 'Dinner'],
         dietaryTags: ['Gluten Free'],
-        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop'
+        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
+        servings: 4,
+        ratingValue: 4.7,
+        ratingCount: 128
       },
       {
         id: '2',
@@ -284,7 +410,10 @@ const FoodSuggestions: React.FC = () => {
         cuisine: 'International',
         mealType: ['Breakfast', 'Lunch', 'Snack'],
         dietaryTags: ['Vegan', 'Gluten Free'],
-        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop'
+        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop',
+        servings: 2,
+        ratingValue: 4.5,
+        ratingCount: 89
       }
     ];
     
@@ -511,73 +640,67 @@ const FoodSuggestions: React.FC = () => {
     navigate(`/food/${foodId}`);
   };
 
-  const handleRate = (foodId: string) => {
-    setRatingModal({ isOpen: true, foodId });
-    setUserRating(0);
+  const getServingsText = (servings?: number) => {
+    if (!servings) return '1 serving';
+    return `${servings} ${servings === 1 ? 'serving' : 'servings'}`;
   };
 
-  // Helper to check if user is guest (not registered)
-  const isGuestUser = (): boolean => {
-    const hasToken = !!localStorage.getItem('access_token');
-    return !hasToken; // Guest if no access_token
-  };
-
-  const submitRating = async () => {
-    if (ratingModal.foodId && userRating > 0) {
-      // Don't save ratings for guest users
-      if (isGuestUser()) {
-        alert('Please sign in to rate recipes. Guest ratings are not saved.');
-        setRatingModal({ isOpen: false, foodId: null });
-        setUserRating(0);
-        return;
-      }
-      
-      try {
-        if (!user?.user_id) {
-          throw new Error('User not initialized');
-        }
-        
-        await apiService.recordUserInteraction(user.user_id, {
-          recipe_id: ratingModal.foodId,
-          event_type: 'like',
-          rating: userRating
-        });
-        
-        const ratings = JSON.parse(localStorage.getItem('foodRatings') || '{}');
-        ratings[ratingModal.foodId] = userRating;
-        localStorage.setItem('foodRatings', JSON.stringify(ratings));
-        
-        setRatingModal({ isOpen: false, foodId: null });
-        setUserRating(0);
-      } catch (err) {
-        console.error('Failed to record rating:', err);
-        setRatingModal({ isOpen: false, foodId: null });
-        setUserRating(0);
-      }
+  const getRatingValueText = (rating?: number) => {
+    if (rating === undefined || rating === null) {
+      return '4.8';
     }
+    return rating.toFixed(1);
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Easy': return 'var(--color-success)';
-      case 'Medium': return 'var(--color-warning)';
-      case 'Hard': return 'var(--color-error)';
-      default: return 'var(--text-secondary)';
-    }
+  const getRatingCountText = (count?: number) => {
+    if (!count) return '0 ratings';
+    return `${count.toLocaleString()} ratings`;
   };
 
-  const getDifficultyText = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Easy': return 'Easy';
-      case 'Medium': return 'Medium';
-      case 'Hard': return 'Hard';
-      default: return difficulty;
-    }
-  };
+  // Check if user is guest
+  const hasAccessToken = !!localStorage.getItem('access_token');
+  const hasUsername = !!user?.username;
+  const isGuest = !hasAccessToken || (user && !hasUsername);
+
+  // For guest users: check if they have completed onboarding in this session
+  // For registered users: check if they completed onboarding in database
+  const guestCompletedOnboarding = JSON.parse(localStorage.getItem('guestCompletedOnboarding') || 'false') === true;
+  const hasCompletedOnboarding = isGuest 
+    ? guestCompletedOnboarding
+    : (user?.completed_onboarding === true);
+
+  // Show loading state while user is being loaded (only for registered users)
+  if (!isGuest && isLoading && !user) {
+    return (
+      <div className="suggestions-container">
+        <div className="container">
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            <h3>Loading...</h3>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If user hasn't completed onboarding, show Onboarding component
+  if (!hasCompletedOnboarding) {
+    return <Onboarding />;
+  }
 
   return (
     <div className="suggestions-container">
       <div className="container">
+        {/* Back to Onboarding Button */}
+        <div className="back-to-onboarding-container">
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={() => navigate('/onboarding')}
+          >
+            ← Back to Onboarding
+          </button>
+        </div>
+
         {/* Ingredients Input Section */}
         <div className="ingredients-input-section">
           <div className="section-header">
@@ -791,71 +914,72 @@ const FoodSuggestions: React.FC = () => {
 
         {/* Suggestions Grid */}
         {hasRequestedSuggestions && !loading && suggestions.length > 0 && (
-          <div className="suggestions-grid">
+          <div className="foods-grid">
             {suggestions.map((suggestion) => (
-              <div key={suggestion.id} className="suggestion-card">
+              <div 
+                key={suggestion.id} 
+                className="food-card"
+                onDoubleClick={() => handleViewDetails(suggestion.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleViewDetails(suggestion.id);
+                  }
+                }}
+                aria-label={`View details for ${suggestion.name}`}
+                tabIndex={0}
+              >
                 <div className="card-image">
                   {suggestion.image ? (
                     <img src={suggestion.image} alt={suggestion.name} />
                   ) : (
                     <div className="placeholder-image"></div>
                   )}
-                  <div className="match-score">
-                    {(suggestion as any).matchScore}% match
-                  </div>
+                  <button
+                    className="card-favorite-btn"
+                    onClick={(e) => toggleLike(suggestion.id, e)}
+                    aria-label={likedRecipes.has(suggestion.id) ? 'Unlike recipe' : 'Like recipe'}
+                    title={likedRecipes.has(suggestion.id) ? 'Unlike recipe' : 'Like recipe'}
+                  >
+                    <Heart 
+                      className="favorite-icon" 
+                      size={20} 
+                      strokeWidth={2}
+                      fill={likedRecipes.has(suggestion.id) ? '#FF6B35' : 'transparent'}
+                      color={likedRecipes.has(suggestion.id) ? '#FF6B35' : '#666666'}
+                    />
+                  </button>
                 </div>
                 
                 <div className="card-content">
-                  <div className="card-header">
-                    <h3>{suggestion.name}</h3>
-                    <div className="cuisine-tag">{suggestion.cuisine}</div>
-                  </div>
+                  <h3 className="home-recipe-title">{suggestion.name}</h3>
                   
-                  <p className="description">{suggestion.description}</p>
-                  
-                  <div className="card-meta">
-                    <div className="meta-item">
-                      <span className="meta-icon"></span>
-                      <span>{suggestion.cookingTime}</span>
+                  <div className="card-meta-rating-group">
+                    <div className="card-meta">
+                      <div className="meta-item">
+                        <Clock className="meta-icon" size={16} strokeWidth={1.5} />
+                        <span>{suggestion.cookingTime}</span>
+                      </div>
+                      <div className="meta-item">
+                        <Users className="meta-icon" size={16} strokeWidth={1.5} />
+                        <span>{getServingsText(suggestion.servings)}</span>
+                      </div>
                     </div>
-                    <div 
-                      className="meta-item difficulty"
-                      style={{ color: getDifficultyColor(suggestion.difficulty) }}
-                    >
-                      <span className="meta-icon"></span>
-                      <span>{getDifficultyText(suggestion.difficulty)}</span>
+
+                    <div className="card-rating">
+                      <Star className="rating-icon" size={16} strokeWidth={1.5} />
+                      <span className="rating-number">{getRatingValueText(suggestion.ratingValue)}</span>
+                      <span className="rating-count">
+                        ({getRatingCountText(suggestion.ratingCount)})
+                      </span>
                     </div>
                   </div>
 
-                  <div className="ingredients-preview">
-                    <h4>Main ingredients:</h4>
-                    <div className="ingredients-list">
-                      {suggestion.ingredients.slice(0, 4).map((ingredient, index) => (
-                        <span key={index} className="ingredient-tag">
-                          {ingredient}
-                        </span>
-                      ))}
-                      {suggestion.ingredients.length > 4 && (
-                        <span className="ingredient-tag more">
-                          +{suggestion.ingredients.length - 4}
-                        </span>
-                      )}
-                    </div>
+                  <div className="card-cuisine-detail">
+                    Cuisine: <strong>{suggestion.cuisine || 'World'}</strong>
                   </div>
 
-                  <div className="card-footer">
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => handleViewDetails(suggestion.id)}
-                    >
-                      View Details
-                    </button>
-                    <button 
-                      className="btn btn-outline"
-                      onClick={() => handleRate(suggestion.id)}
-                    >
-                      Rate
-                    </button>
+                  <div className="card-hint">
+                    Double-click to view details
                   </div>
                 </div>
               </div>
@@ -891,7 +1015,7 @@ const FoodSuggestions: React.FC = () => {
                 />
                 <label htmlFor="image-upload" className="upload-label">
                   {imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="image-preview" />
+                    <img src={imagePreview || undefined} alt="Preview" className="image-preview" />
                   ) : (
                     <div className="upload-placeholder">
                       <span>📷</span>
@@ -922,44 +1046,9 @@ const FoodSuggestions: React.FC = () => {
         </div>
       )}
 
-      {/* Rating Modal */}
-      {ratingModal.isOpen && (
-        <div className="rating-modal-overlay">
-          <div className="rating-modal">
-            <h3>Rate Dish</h3>
-            <div className="rating-stars">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  className={`star ${star <= userRating ? 'filled' : ''}`}
-                  onClick={() => setUserRating(star)}
-                >
-                  ★
-                </button>
-              ))}
-            </div>
-            <p>{userRating > 0 ? `${userRating} stars` : 'Select rating'}</p>
-            <div className="modal-actions">
-              <button 
-                className="btn btn-outline"
-                onClick={() => setRatingModal({ isOpen: false, foodId: null })}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn btn-primary"
-                onClick={submitRating}
-                disabled={userRating === 0}
-              >
-                Submit Rating
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };
 
 export default FoodSuggestions;
+

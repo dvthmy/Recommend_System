@@ -84,7 +84,10 @@ const FoodDetail: React.FC = () => {
     cuisine: recipe.cuisine || 'Unknown',
     mealType: ['Lunch', 'Dinner'], // Default meal types
     dietaryTags: recipe.allergens || [],
-    image: recipe.image_urls?.[0] || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop'
+    image: recipe.image_urls?.[0] || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop',
+    servings: recipe.servings,
+    ratingValue: recipe.rating_value,
+    ratingCount: recipe.rating_count
   } : null;
 
   // Get instructions from recipe or use default
@@ -130,7 +133,7 @@ const FoodDetail: React.FC = () => {
       try {
         await apiService.recordUserInteraction(userId, {
           recipe_id: recipe.recipe_id,
-          event_type: 'like',
+          event_type: 'rating',
           rating: 5 // Default high rating for now
         });
         alert('Recipe rated successfully!');
@@ -150,9 +153,11 @@ const FoodDetail: React.FC = () => {
     const userId = localStorage.getItem('userId');
     if (userId && recipe) {
       try {
+        // When user rates a recipe, it's considered as 'rated' (rating event)
         await apiService.recordUserInteraction(userId, {
           recipe_id: recipe.recipe_id,
-          event_type: 'save'
+          event_type: 'rating',
+          rating: 5 // Default rating when adding to favorites
         });
         alert('Recipe added to favorites!');
       } catch (err) {

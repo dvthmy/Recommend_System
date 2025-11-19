@@ -63,4 +63,7 @@ export interface FoodSuggestion {
   mealType?: string[];
   dietaryTags?: string[];
   maxMinutes?: number;
+  servings?: number;
+  ratingValue?: number;
+  ratingCount?: number;
 }

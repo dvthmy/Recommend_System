@@ -12,11 +12,11 @@ interface AvailableIngredient {
 const Profile: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, allergies, favoriteCuisines, loadUserProfile, loadUserAllergies, loadUserFavoriteCuisines, isLoading } = useUser();
+  const { user, allergies, favoriteCuisines, loadUserProfile, loadUserAllergies, loadUserFavoriteCuisines, isLoading, logout } = useUser();
   const [isEditing, setIsEditing] = useState(false);
   const [activityStats, setActivityStats] = useState({
     likedRecipes: 0,
-    savedRecipes: 0,
+    viewedRecipes: 0,
     ratedRecipes: 0
   });
   
@@ -46,15 +46,30 @@ const Profile: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Reload data when navigating to Profile page (e.g., after Onboarding)
+  // Reload data when navigating to Profile page (e.g., after Onboarding or returning from History)
   useEffect(() => {
     const userId = localStorage.getItem('userId');
     if (userId && location.pathname === '/profile' && hasLoadedRef.current) {
       // Reload data when user navigates to Profile page to get latest data
       loadUserData();
+      loadActivityStats();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+
+  // Listen for interaction updates from other components (e.g., History, Home)
+  useEffect(() => {
+    const handleInteractionUpdate = () => {
+      // Reload activity stats when interaction is updated
+      loadActivityStats();
+    };
+
+    window.addEventListener('interactionUpdated', handleInteractionUpdate);
+    return () => {
+      window.removeEventListener('interactionUpdated', handleInteractionUpdate);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isEditing) {
@@ -150,13 +165,13 @@ const Profile: React.FC = () => {
           
           setActivityStats({
             likedRecipes: statsRes.data.stats.like_count || 0,
-            savedRecipes: statsRes.data.stats.save_count || 0,
+            viewedRecipes: statsRes.data.stats.view_count || 0,
             ratedRecipes: rated
           });
         } catch (err) {
           setActivityStats({
             likedRecipes: statsRes.data.stats.like_count || 0,
-            savedRecipes: statsRes.data.stats.save_count || 0,
+            viewedRecipes: statsRes.data.stats.view_count || 0,
             ratedRecipes: 0
           });
         }
@@ -167,16 +182,29 @@ const Profile: React.FC = () => {
       try {
         const interactionsRes = await apiService.getUserInteractions(userId, undefined, 1000, 0);
         if (interactionsRes.data) {
-          const interactions = interactionsRes.data.interactions || [];
-          const liked = interactions.filter((i: any) => i.event_type === 'LIKE' || i.liked === true).length;
-          const saved = interactions.filter((i: any) => i.event_type === 'SAVE' || i.saved === true).length;
-          const rated = interactions.filter((i: any) => i.rating && i.rating > 0).length;
-          
-          setActivityStats({
-            likedRecipes: liked,
-            savedRecipes: saved,
-            ratedRecipes: rated
-          });
+          // Response structure when no event_type: { likes: [], views: [], ratings: [] }
+          // Response structure when event_type='like': { interactions: [{ recipe_id: ... }] }
+          const data = interactionsRes.data as any; // Use type assertion for flexible response structure
+          if (data.likes && Array.isArray(data.likes)) {
+            // Response without event_type filter
+            setActivityStats({
+              likedRecipes: data.likes?.length || 0,
+              viewedRecipes: data.views?.length || 0,
+              ratedRecipes: data.ratings?.length || 0
+            });
+          } else if (data.interactions && Array.isArray(data.interactions)) {
+            // Response with event_type filter (shouldn't happen with undefined event_type, but handle it)
+            const interactions = data.interactions || [];
+            const liked = interactions.filter((i: any) => i.liked === true).length;
+            const viewed = interactions.filter((i: any) => i.view_count && i.view_count > 0).length;
+            const rated = interactions.filter((i: any) => i.rating && i.rating > 0).length;
+            
+            setActivityStats({
+              likedRecipes: liked,
+              viewedRecipes: viewed,
+              ratedRecipes: rated
+            });
+          }
         }
       } catch (err2) {
         console.error('Failed to load activity stats:', err2);
@@ -444,10 +472,23 @@ const Profile: React.FC = () => {
             <div className="preferences-section">
               <div className="section-header">
                 <h2 className="section-title">Food Preferences</h2>
-                <button className="edit-profile-btn" onClick={handleEditProfile}>
-                  <span className="edit-icon">✏️</span>
-                  Edit Profile
-                </button>
+                <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
+                  <button className="edit-profile-btn" onClick={handleEditProfile}>
+                    <span className="edit-icon">✏️</span>
+                    Edit Profile
+                  </button>
+                  <button 
+                    className="btn btn-outline btn-sm" 
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to logout? All your data will be cleared.')) {
+                        logout();
+                        navigate('/');
+                      }
+                    }}
+                  >
+                    Logout
+                  </button>
+                </div>
               </div>
 
               <div className="preferences-content">
@@ -717,9 +758,9 @@ const Profile: React.FC = () => {
                   <div className="activity-count">{activityStats.likedRecipes}</div>
                 </div>
                 <div className="activity-card">
-                  <div className="activity-icon activity-icon-saved">🔖</div>
-                  <div className="activity-label">Saved Recipes</div>
-                  <div className="activity-count">{activityStats.savedRecipes}</div>
+                  <div className="activity-icon activity-icon-saved">👁️</div>
+                  <div className="activity-label">Viewed Recipes</div>
+                  <div className="activity-count">{activityStats.viewedRecipes}</div>
                 </div>
                 <div className="activity-card">
                   <div className="activity-icon activity-icon-rated">⭐</div>

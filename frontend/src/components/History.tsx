@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Heart } from 'lucide-react';
 import { apiService } from '../services/api';
 import './History.css';
 
@@ -10,19 +11,124 @@ interface RecipeCard {
   cookTime: string;
   cuisine: string;
   rating?: number;
+  lastView?: string;
+  likeTime?: string;
+  ratingTime?: string;
 }
 
 const History: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'liked' | 'rated' | 'saved'>('liked');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'liked' | 'rated' | 'viewed'>('viewed');
   const [recipes, setRecipes] = useState<RecipeCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [likedRecipes, setLikedRecipes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    loadLikedRecipes();
     loadRecipes();
   }, [activeTab]);
+
+  const loadLikedRecipes = async () => {
+    // For guest users, load from localStorage
+    const isGuest = !localStorage.getItem('access_token');
+    if (isGuest) {
+      try {
+        const liked = JSON.parse(localStorage.getItem('likedRecipes') || '[]');
+        setLikedRecipes(new Set(liked));
+      } catch (err) {
+        console.error('Failed to load liked recipes from localStorage:', err);
+      }
+      return;
+    }
+
+    // For registered users, load from backend
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    try {
+      const response = await apiService.getUserInteractions(userId, 'like', 100, 0);
+      if (response.data && response.data.interactions) {
+        const liked = new Set(response.data.interactions.map((interaction: any) => interaction.recipe_id));
+        setLikedRecipes(liked);
+      }
+    } catch (err) {
+      console.error('Failed to load liked recipes:', err);
+    }
+  };
+
+  const toggleLike = async (recipeId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent navigation
+    
+    const isGuest = !localStorage.getItem('access_token');
+    const isLiked = likedRecipes.has(recipeId);
+
+    if (isGuest) {
+      // For guest users, save to localStorage
+      const newLiked = new Set(likedRecipes);
+      if (isLiked) {
+        newLiked.delete(recipeId);
+      } else {
+        newLiked.add(recipeId);
+      }
+      setLikedRecipes(newLiked);
+      localStorage.setItem('likedRecipes', JSON.stringify(Array.from(newLiked)));
+      
+      // If in liked tab, remove from list
+      if (activeTab === 'liked' && isLiked) {
+        setRecipes(prev => prev.filter(r => r.id !== recipeId));
+      }
+      return;
+    }
+
+    // For registered users, update backend
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert('Please sign in to like recipes.');
+      return;
+    }
+
+    // Optimistic update: update UI immediately
+    const newLiked = new Set(likedRecipes);
+    if (isLiked) {
+      newLiked.delete(recipeId);
+    } else {
+      newLiked.add(recipeId);
+    }
+    setLikedRecipes(newLiked);
+
+    try {
+      // Backend will toggle like/unlike automatically
+      await apiService.recordUserInteraction(userId, {
+        recipe_id: recipeId,
+        event_type: 'like'
+      });
+      
+      // Reload liked recipes from backend to sync
+      // Note: Unlike only sets liked=false in database, does NOT delete the recipe
+      await loadLikedRecipes();
+      
+      // If unliked, remove from current display list if in liked tab
+      // This only removes from UI, recipe still exists in database
+      if (isLiked && activeTab === 'liked') {
+        setRecipes(prev => prev.filter(r => r.id !== recipeId));
+      } else if (!isLiked && activeTab === 'liked') {
+        // If liked, reload recipes to show the new liked recipe in History
+        await loadRecipes();
+      }
+      
+      // Dispatch event to notify Profile component to reload stats
+      // This updates the like count in Profile, but does NOT delete the recipe
+      window.dispatchEvent(new CustomEvent('interactionUpdated', { 
+        detail: { type: 'like', recipeId, isLiked: !isLiked } 
+      }));
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+      // Revert optimistic update on error
+      setLikedRecipes(likedRecipes);
+      alert('Failed to update like. Please try again.');
+    }
+  };
 
   const loadRecipes = async () => {
     setLoading(true);
@@ -55,7 +161,8 @@ const History: React.FC = () => {
                   cookTime: recipeResponse.data.cook_time_min 
                     ? `${recipeResponse.data.cook_time_min} min` 
                     : 'Unknown',
-                  cuisine: recipeResponse.data.cuisine || 'Unknown'
+                  cuisine: recipeResponse.data.cuisine || 'Unknown',
+                  likeTime: (interaction as any).like_time || (interaction as any).timestamp
                 });
               }
             } catch (err) {
@@ -65,7 +172,7 @@ const History: React.FC = () => {
         }
       } else if (activeTab === 'rated') {
         // Load rated recipes
-        const ratedResponse = await apiService.getUserInteractions(userId, 'like', 50, 0);
+        const ratedResponse = await apiService.getUserInteractions(userId, 'rating', 50, 0);
         if (ratedResponse.data?.interactions) {
           for (const interaction of ratedResponse.data.interactions) {
             if (interaction.rating) {
@@ -82,7 +189,8 @@ const History: React.FC = () => {
                       ? `${recipeResponse.data.cook_time_min} min` 
                       : 'Unknown',
                     cuisine: recipeResponse.data.cuisine || 'Unknown',
-                    rating: interaction.rating
+                    rating: interaction.rating,
+                    ratingTime: (interaction as any).rating_time || (interaction as any).timestamp
                   });
                 }
               } catch (err) {
@@ -91,11 +199,11 @@ const History: React.FC = () => {
             }
           }
         }
-      } else if (activeTab === 'saved') {
-        // Load saved recipes (using like as saved for now)
-        const savedResponse = await apiService.getUserInteractions(userId, 'like', 50, 0);
-        if (savedResponse.data?.interactions) {
-          for (const interaction of savedResponse.data.interactions) {
+      } else if (activeTab === 'viewed') {
+        // Load viewed recipes
+        const viewedResponse = await apiService.getUserInteractions(userId, 'view', 50, 0);
+        if (viewedResponse.data?.interactions) {
+          for (const interaction of viewedResponse.data.interactions) {
             try {
               const recipeResponse = await apiService.getRecipeDetail(interaction.recipe_id);
               if (recipeResponse.data) {
@@ -108,7 +216,8 @@ const History: React.FC = () => {
                   cookTime: recipeResponse.data.cook_time_min 
                     ? `${recipeResponse.data.cook_time_min} min` 
                     : 'Unknown',
-                  cuisine: recipeResponse.data.cuisine || 'Unknown'
+                  cuisine: recipeResponse.data.cuisine || 'Unknown',
+                  lastView: (interaction as any).last_view || (interaction as any).timestamp
                 });
               }
             } catch (err) {
@@ -117,6 +226,35 @@ const History: React.FC = () => {
           }
         }
       }
+
+      // Sort recipes by timestamp (most recent first)
+      allRecipes.sort((a, b) => {
+        const getTimestamp = (recipe: RecipeCard): number => {
+          let timestampStr: string | undefined;
+          if (activeTab === 'viewed') {
+            timestampStr = recipe.lastView;
+          } else if (activeTab === 'liked') {
+            timestampStr = recipe.likeTime;
+          } else if (activeTab === 'rated') {
+            timestampStr = recipe.ratingTime;
+          }
+          
+          if (!timestampStr) return 0;
+          
+          try {
+            const date = new Date(timestampStr);
+            return date.getTime();
+          } catch {
+            return 0;
+          }
+        };
+        
+        const timeA = getTimestamp(a);
+        const timeB = getTimestamp(b);
+        
+        // Sort descending (most recent first)
+        return timeB - timeA;
+      });
 
       setRecipes(allRecipes);
     } catch (err) {
@@ -142,20 +280,73 @@ const History: React.FC = () => {
     ];
   };
 
-  const filteredRecipes = recipes.filter(recipe =>
-    recipe.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
-  const getSearchPlaceholder = () => {
-    switch (activeTab) {
-      case 'liked':
-        return 'Search in my liked recipes...';
-      case 'rated':
-        return 'Search in my rated recipes...';
-      case 'saved':
-        return 'Search in my saved recipes...';
-      default:
-        return 'Search recipes...';
+  const formatTimeAgo = (dateString?: string | any): string => {
+    if (!dateString) return '';
+    
+    try {
+      let date: Date;
+      
+      // Handle Neo4j datetime format or ISO string
+      if (typeof dateString === 'string') {
+        // If it's already an ISO string, use it directly
+        date = new Date(dateString);
+      } else if (dateString && typeof dateString === 'object') {
+        // Handle Neo4j datetime object (has epochSeconds or epochMillis)
+        if (dateString.epochSeconds) {
+          date = new Date(dateString.epochSeconds * 1000);
+        } else if (dateString.epochMillis) {
+          date = new Date(dateString.epochMillis);
+        } else if (dateString.toString) {
+          // Try to convert to string first
+          date = new Date(dateString.toString());
+        } else {
+          return '';
+        }
+      } else {
+        return '';
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return '';
+      }
+      
+      const now = new Date();
+      const diffInMs = now.getTime() - date.getTime();
+      
+      // Check if diff is valid
+      if (isNaN(diffInMs) || diffInMs < 0) {
+        return 'Just now';
+      }
+      
+      const diffInSeconds = Math.floor(diffInMs / 1000);
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      const diffInDays = Math.floor(diffInHours / 24);
+      const diffInWeeks = Math.floor(diffInDays / 7);
+      const diffInMonths = Math.floor(diffInDays / 30);
+      const diffInYears = Math.floor(diffInDays / 365);
+
+      if (diffInSeconds < 60) {
+        return 'Just now';
+      } else if (diffInMinutes < 60) {
+        return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
+      } else if (diffInHours < 24) {
+        return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
+      } else if (diffInDays < 7) {
+        return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`;
+      } else if (diffInWeeks < 4) {
+        return `${diffInWeeks} ${diffInWeeks === 1 ? 'week' : 'weeks'} ago`;
+      } else if (diffInMonths < 12) {
+        return `${diffInMonths} ${diffInMonths === 1 ? 'month' : 'months'} ago`;
+      } else {
+        return `${diffInYears} ${diffInYears === 1 ? 'year' : 'years'} ago`;
+      }
+    } catch (err) {
+      console.error('Failed to format date:', err, dateString);
+      return '';
     }
   };
 
@@ -183,6 +374,12 @@ const History: React.FC = () => {
         {/* Navigation Tabs */}
         <div className="activity-tabs">
           <button
+            className={`tab-button ${activeTab === 'viewed' ? 'active' : ''}`}
+            onClick={() => setActiveTab('viewed')}
+          >
+            Viewed
+          </button>
+          <button
             className={`tab-button ${activeTab === 'liked' ? 'active' : ''}`}
             onClick={() => setActiveTab('liked')}
           >
@@ -194,29 +391,6 @@ const History: React.FC = () => {
           >
             Rated
           </button>
-          <button
-            className={`tab-button ${activeTab === 'saved' ? 'active' : ''}`}
-            onClick={() => setActiveTab('saved')}
-          >
-            Saved
-          </button>
-        </div>
-
-        {/* Search Bar */}
-        <div className="activity-search">
-          <div className="search-input-wrapper">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="search-icon">
-              <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="m19 19-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <input
-              type="text"
-              placeholder={getSearchPlaceholder()}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input"
-            />
-          </div>
         </div>
 
         {/* Error Message */}
@@ -230,15 +404,15 @@ const History: React.FC = () => {
         )}
 
         {/* Recipe Grid */}
-        {filteredRecipes.length === 0 ? (
+        {recipes.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📋</div>
             <h4>No recipes found</h4>
-            <p>Start {activeTab === 'liked' ? 'liking' : activeTab === 'rated' ? 'rating' : 'saving'} recipes to see them here</p>
+            <p>Start {activeTab === 'liked' ? 'liking' : activeTab === 'rated' ? 'rating' : 'viewing'} recipes to see them here</p>
           </div>
         ) : (
           <div className="recipe-grid">
-            {filteredRecipes.map((recipe) => (
+            {recipes.map((recipe) => (
               <div
                 key={recipe.id}
                 className="recipe-card"
@@ -246,15 +420,60 @@ const History: React.FC = () => {
               >
                 <div className="recipe-image-wrapper">
                   <img src={recipe.image} alt={recipe.title} className="recipe-image" />
-                  <div className="heart-icon">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M17.5 5.83333C17.5 3.33333 15.4167 1.25 12.9167 1.25C11.6667 1.25 10.5 1.75 9.58333 2.58333C8.66667 1.75 7.5 1.25 6.25 1.25C3.75 1.25 1.66667 3.33333 1.66667 5.83333C1.66667 6.83333 2 7.75 2.58333 8.5L9.58333 15.5L16.5833 8.5C17.1667 7.75 17.5 6.83333 17.5 5.83333Z" fill="var(--color-primary)" stroke="var(--color-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
+                  <button
+                    className={`history-heart-btn ${likedRecipes.has(recipe.id) ? 'liked' : ''}`}
+                    onClick={(e) => toggleLike(recipe.id, e)}
+                    aria-label={likedRecipes.has(recipe.id) ? 'Unlike recipe' : 'Like recipe'}
+                    title={likedRecipes.has(recipe.id) ? 'Unlike recipe' : 'Like recipe'}
+                  >
+                    <Heart 
+                      className="favorite-icon" 
+                      size={20} 
+                      strokeWidth={2}
+                      fill={likedRecipes.has(recipe.id) ? '#FF6B35' : 'transparent'}
+                      color={likedRecipes.has(recipe.id) ? '#FF6B35' : '#666666'}
+                    />
+                  </button>
                 </div>
                 <div className="recipe-info">
                   <h3 className="recipe-title">{recipe.title}</h3>
-                  <p className="recipe-details">{recipe.cookTime} • {recipe.cuisine}</p>
+                  {activeTab === 'viewed' && recipe.lastView ? (
+                    <div className="recipe-meta">
+                      <div className="recipe-status">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="view-icon">
+                          <path d="M8 2C4.5 2 1.73 4.61 1 8c.73 3.39 3.5 6 7 6s6.27-2.61 7-6c-.73-3.39-3.5-6-7-6zM8 12.5c-2.48 0-4.5-2.02-4.5-4.5S5.52 3.5 8 3.5s4.5 2.02 4.5 4.5-2.02 4.5-4.5 4.5z" fill="currentColor"/>
+                          <path d="M8 6.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="currentColor"/>
+                        </svg>
+                        <span className="viewed-badge">Viewed</span>
+                        <span className="meta-separator">•</span>
+                        <span className="time-ago">{formatTimeAgo(recipe.lastView)}</span>
+                      </div>
+                    </div>
+                  ) : activeTab === 'liked' && recipe.likeTime ? (
+                    <div className="recipe-meta">
+                      <div className="recipe-status">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="heart-icon-small">
+                          <path d="M13.3334 4C13.3334 2.15905 11.8413 0.666672 10.0001 0.666672C9.00008 0.666672 8.06675 1.07467 7.40008 1.73334C6.73341 1.07467 5.80008 0.666672 4.80008 0.666672C2.95875 0.666672 1.46675 2.15905 1.46675 4C1.46675 4.73334 1.73341 5.40001 2.16675 5.93334L7.40008 11.1667L12.6334 5.93334C13.0667 5.40001 13.3334 4.73334 13.3334 4Z" fill="currentColor"/>
+                        </svg>
+                        <span className="liked-badge">Liked</span>
+                        <span className="meta-separator">•</span>
+                        <span className="time-ago">{formatTimeAgo(recipe.likeTime)}</span>
+                      </div>
+                    </div>
+                  ) : activeTab === 'rated' && recipe.ratingTime ? (
+                    <div className="recipe-meta">
+                      <div className="recipe-status">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="star-icon-small">
+                          <path d="M8 1L10.163 5.808L15 6.587L11.5 9.692L12.326 14.5L8 12.192L3.674 14.5L4.5 9.692L1 6.587L5.837 5.808L8 1Z" fill="currentColor"/>
+                        </svg>
+                        <span className="rated-badge">Rated {recipe.rating}⭐</span>
+                        <span className="meta-separator">•</span>
+                        <span className="time-ago">{formatTimeAgo(recipe.ratingTime)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="recipe-details">{recipe.cookTime} • {recipe.cuisine}</p>
+                  )}
                 </div>
               </div>
             ))}

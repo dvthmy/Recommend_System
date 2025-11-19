@@ -75,6 +75,9 @@ export interface RecipeDetail {
   prep_time_min?: number;
   total_time_min?: number;
   servings?: number;
+  rating_value?: number;
+  rating_count?: number;
+  review_count?: number;
   instructions?: string;
   tags?: string[];
   image_urls?: string[];
@@ -119,6 +122,8 @@ export interface RecommendationRequest {
   ingredient_ids?: string[];
   ingredient_names?: string[];
   max_cook_time?: number;
+  recipe_category?: string;  // Meal type / recipe category
+  preferred_cuisines?: string[];  // Preferred cuisines for priority ranking
   limit?: number;
   min_match_ratio?: number;
 }
@@ -185,7 +190,7 @@ export interface UserInteraction {
   interaction_id?: string;
   user_id: string;
   recipe_id: string;
-  event_type: 'cook' | 'like' | 'save' | 'view' | 'dislike';
+  event_type: 'like' | 'rating' | 'view';
   timestamp?: string;
   rating?: number;
   notes?: string;
@@ -195,7 +200,7 @@ export interface UserInteraction {
 
 export interface InteractionRecordRequest {
   recipe_id: string;
-  event_type: 'cook' | 'like' | 'save' | 'view' | 'dislike';
+  event_type: 'like' | 'rating' | 'view';
   rating?: number;
   notes?: string;
   duration_minutes?: number;
@@ -213,11 +218,9 @@ export interface UserInteractionsResponse {
 
 export interface InteractionStats {
   total_interactions: number;
-  cook_count: number;
   like_count: number;
   save_count: number;
   view_count: number;
-  dislike_count: number;
   average_rating?: number;
   most_recent_interaction?: string;
 }

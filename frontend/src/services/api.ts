@@ -312,6 +312,21 @@ class ApiService {
     return this.request<UserInteractionStatsResponse>(`/users/${user_id}/interactions/stats`);
   }
 
+  async deleteUserInteraction(
+    user_id: string,
+    recipe_id: string,
+    event_type?: string
+  ): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    if (event_type) params.append('event_type', event_type);
+    const queryString = params.toString();
+    const url = `/users/${user_id}/interactions/${recipe_id}${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request<any>(url, {
+      method: 'DELETE',
+    });
+  }
+
   async recomputeUserProfile(user_id: string, force_recompute: boolean = false): Promise<ApiResponse<any>> {
     return this.request<any>(`/users/${user_id}/recompute-profile`, {
       method: 'POST',
