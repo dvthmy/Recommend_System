@@ -78,6 +78,7 @@ export interface RecipeDetail {
   rating_value?: number;
   rating_count?: number;
   review_count?: number;
+  description?: string;
   instructions?: string;
   tags?: string[];
   image_urls?: string[];

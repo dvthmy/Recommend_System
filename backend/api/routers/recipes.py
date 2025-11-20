@@ -21,7 +21,10 @@ async def search_recipes(
         where.append("(toLower(r.title) CONTAINS toLower($q) OR toLower(r.instructions) CONTAINS toLower($q))")
         params["q"] = query
     if cuisine:
-        where.append("r.cuisine = $c"); params["c"] = cuisine
+        # Handle cuisine as array (case-insensitive matching)
+        # Check if cuisine matches any element in the cuisine array
+        where.append("r.cuisine IS NOT NULL AND any(c IN r.cuisine WHERE c IS NOT NULL AND toLower(toString(c)) = toLower($c))")
+        params["c"] = cuisine
     if max_cook_time is not None:
         where.append("r.cook_time_min <= $m"); params["m"] = max_cook_time
     wc = " AND ".join(where)

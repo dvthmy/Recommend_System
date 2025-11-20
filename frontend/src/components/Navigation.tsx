@@ -22,8 +22,7 @@ const Navigation: React.FC<NavigationProps> = ({ isLoggedIn: propIsLoggedIn }: N
 
   const navigationItems = [
     { path: '/', label: 'Home' },
-    { path: '/onboarding', label: 'Onboarding' },
-    { path: '/suggestions', label: 'Suggestions' },
+    { path: '/onboarding', label: 'Suggestions' },
     { path: '/history', label: 'History' },
   ];
 
