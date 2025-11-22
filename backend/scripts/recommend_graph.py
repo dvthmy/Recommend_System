@@ -22,11 +22,16 @@ from typing import Dict, List, Optional
 # =========================================================
 # Define cuisine groups for priority-based matching
 # Priority: 1 = exact match, 2 = same group, 3 = all others
+# NOTE: This dictionary is used by get_cuisine_priority() function,
+# but the main recommendation logic in recommend_knowledge_based() 
+# uses hardcoded groups in the Cypher query (see lines 378-382).
+# The "All" group was removed because:
+# - When user selects "All", target_cuisines = [] (no preference)
+# - Cuisines like "American", "World", "Indian" are not grouped in the Cypher logic
 CUISINE_GROUPS = {
     "Asian": ["Vietnamese", "Chinese", "Japanese", "Korean", "Thai", "Asian"],
     "European": ["Italian", "French", "British", "European"],
-    "Latin": ["Mexican", "Caribbean"],
-    "All": ["American", "World", "Indian"]
+    "Latin": ["Mexican", "Caribbean"]
 }
 
 def get_cuisine_priority(recipe_cuisine: str, target_cuisine: Optional[str]) -> int:
@@ -213,20 +218,31 @@ class GraphHybridRecommender:
     # ---------------------------------------------------
     # 📊 Get cuisine interaction counts for user
     # ---------------------------------------------------
-    def get_cuisine_interaction_counts(self, session, user_id: str) -> Dict[str, int]:
+    def get_cuisine_interaction_counts(self, session, user_id: str) -> Dict[str, Dict[str, int]]:
         """
-        Count how many times user has interacted with each cuisine.
-        Returns dict: {cuisine_name: count}
+        Count how many times user has interacted with each cuisine, broken down by interaction type.
+        Returns dict: {cuisine_name: {"view": count, "like": count, "rating": count}}
         """
         q = """
         MATCH (u:User {user_id: $uid})-[iv:INTERACTED_WITH]->(r:Recipe)
         UNWIND r.cuisine AS cuisine_name
-        WITH toLower(cuisine_name) AS cuisine, count(iv) AS interaction_count
-        RETURN cuisine, interaction_count
-        ORDER BY interaction_count DESC
+        WITH toLower(cuisine_name) AS cuisine, iv, r
+        WITH cuisine,
+            sum(CASE WHEN iv.view_count > 0 THEN 1 ELSE 0 END) AS view_count,
+            sum(CASE WHEN iv.liked = true THEN 1 ELSE 0 END) AS like_count,
+            sum(CASE WHEN iv.rating IS NOT NULL AND iv.rating > 0 THEN 1 ELSE 0 END) AS rating_count
+        RETURN cuisine, view_count, like_count, rating_count
+        ORDER BY (view_count + like_count + rating_count) DESC
         """
         result = session.run(q, uid=user_id)
-        return {row["cuisine"]: row["interaction_count"] for row in result}
+        return {
+            row["cuisine"]: {
+                "view": row["view_count"],
+                "like": row["like_count"],
+                "rating": row["rating_count"]
+            }
+            for row in result
+        }
 
     # ---------------------------------------------------
     # 🔍 Knowledge-Based Reasoning (no score, Jaccard)
@@ -234,14 +250,18 @@ class GraphHybridRecommender:
     def recommend_knowledge_based(self, session, user_id, ingredient_ids,
                                   user_profile, limit=30, min_match_ratio=0.4,
                                   max_cook_time=None, recipe_category=None, preferred_cuisines=None,
-                                  cuisine_diversity_threshold=5, ingredient_match_context=None):
+                                  cuisine_diversity_threshold=None, ingredient_match_context=None):
         """
         Recommend recipes with cuisine diversity balance.
         
         Args:
-            cuisine_diversity_threshold: If user has interacted with a cuisine >= this many times,
-                                        reduce its priority to encourage exploration
+            cuisine_diversity_threshold: Dict with thresholds for each interaction type.
+                                        Default: {"view": 20, "like": 15, "rating": 10}
+                                        A cuisine is considered "overused" if any threshold is exceeded.
         """
+        # Set default thresholds if not provided
+        if cuisine_diversity_threshold is None:
+            cuisine_diversity_threshold = {"view": 20, "like": 15, "rating": 10}
         fav_cuisines = user_profile.get("fav_cuisines")  # Can be None, [], or list
         allergies = user_profile.get("allergies", [])
         max_cook = max_cook_time or user_profile.get("maxCook", None)
@@ -273,9 +293,19 @@ class GraphHybridRecommender:
             target_cuisines = [c.strip() for c in target_cuisines.split(",")]
         target_cuisines = [c.lower() for c in target_cuisines if c]
         
-        # Identify overused cuisines (high usage frequency)
-        overused_cuisines = {c: count for c, count in cuisine_counts.items() 
-                            if count >= cuisine_diversity_threshold}
+        # Handle "All" = "No Preference": if "all" is in the list, treat as no preference (empty list)
+        # This allows frontend to send "All" to indicate no cuisine preference
+        if "all" in target_cuisines:
+            target_cuisines = []  # No preference - show all cuisines
+        
+        # Identify overused cuisines (high usage frequency for any interaction type)
+        # A cuisine is overused if view > threshold OR like > threshold OR rating > threshold
+        overused_cuisines = {}
+        for cuisine, counts in cuisine_counts.items():
+            if (counts.get("view", 0) > cuisine_diversity_threshold.get("view", 20) or
+                counts.get("like", 0) > cuisine_diversity_threshold.get("like", 15) or
+                counts.get("rating", 0) > cuisine_diversity_threshold.get("rating", 10)):
+                overused_cuisines[cuisine] = counts
 
         q = """
         MATCH (u:User {user_id:$uid})
@@ -307,7 +337,7 @@ class GraphHybridRecommender:
             END AS match_type
         WHERE match_type IS NOT NULL
         AND ($max_cook IS NULL OR
-            coalesce(r.total_time_min, r.cook_time_min, r.prep_time_min, 999999) <= $max_cook)
+            coalesce(r.cook_time_min, 999999) <= $max_cook)
         AND ($recipe_category IS NULL OR 
             r.recipe_category = $recipe_category OR
             toLower(r.recipe_category) = toLower($recipe_category) OR
@@ -332,37 +362,41 @@ class GraphHybridRecommender:
             CASE 
                 WHEN $max_cook IS NOT NULL THEN
                     CASE 
-                        WHEN coalesce(r.total_time_min, r.cook_time_min, r.prep_time_min, 999999) <= $max_cook THEN
+                        WHEN coalesce(r.cook_time_min, 999999) <= $max_cook THEN
                             // Prefer recipes closer to max_cook (but not exceeding)
-                            1.0 - (toFloat(coalesce(r.total_time_min, r.cook_time_min, r.prep_time_min, 0)) / toFloat($max_cook)) * 0.5
+                            1.0 - (toFloat(coalesce(r.cook_time_min, 0)) / toFloat($max_cook)) * 0.5
                         ELSE 0.0
                     END
                 ELSE 1.0  // No time preference = all recipes equal
             END AS time_preference_score
             
-        // Count interactions for each cuisine in this recipe
-        OPTIONAL MATCH (u)-[:INTERACTED_WITH]->(prev_r:Recipe)
+        // Count interactions for each cuisine in this recipe (by type)
+        OPTIONAL MATCH (u)-[iv:INTERACTED_WITH]->(prev_r:Recipe)
         WHERE any(rc IN recipe_cuisines WHERE rc IN [c IN prev_r.cuisine | toLower(c)])
         WITH u, allergies, fav_cuisines, liked_recipes, r, matched_ing, matched_categories,
             recipe_cuisines, matches_user_meal_choice, time_preference_score,
             match_types,
-            count(DISTINCT prev_r) AS cuisine_interaction_count,
+            sum(CASE WHEN iv.view_count > 0 THEN 1 ELSE 0 END) AS cuisine_view_count,
+            sum(CASE WHEN iv.liked = true THEN 1 ELSE 0 END) AS cuisine_like_count,
+            sum(CASE WHEN iv.rating IS NOT NULL AND iv.rating > 0 THEN 1 ELSE 0 END) AS cuisine_rating_count,
             // Check if recipe has new/unexplored cuisines (not in cuisine_counts dict)
             any(rc IN recipe_cuisines WHERE NOT rc IN keys($cuisine_counts)) AS has_new_cuisine
             
         WITH u, allergies, fav_cuisines, liked_recipes, r, matched_ing, matched_categories,
-            recipe_cuisines, cuisine_interaction_count, has_new_cuisine,
+            recipe_cuisines, cuisine_view_count, cuisine_like_count, cuisine_rating_count, has_new_cuisine,
             matches_user_meal_choice, time_preference_score,
             size([type IN match_types WHERE type='exact']) AS exact_match_count,
             size([type IN match_types WHERE type='base']) AS base_match_count,
             size([type IN match_types WHERE type='synonym']) AS synonym_match_count
             
         WITH u, allergies, fav_cuisines, liked_recipes, r, matched_ing, matched_categories,
-            recipe_cuisines, cuisine_interaction_count, has_new_cuisine,
+            recipe_cuisines, cuisine_view_count, cuisine_like_count, cuisine_rating_count, has_new_cuisine,
             matches_user_meal_choice, time_preference_score, exact_match_count,
             base_match_count, synonym_match_count,
-            // Check if any recipe cuisine is overused (>= threshold)
-            cuisine_interaction_count >= $diversity_threshold AS has_overused_cuisine,
+            // Check if any recipe cuisine is overused (any interaction type exceeds threshold)
+            (cuisine_view_count > $diversity_threshold_view OR 
+             cuisine_like_count > $diversity_threshold_like OR 
+             cuisine_rating_count > $diversity_threshold_rating) AS has_overused_cuisine,
             // Calculate base cuisine priority: 1=exact match any, 2=same group match any, 3=all others
             CASE 
                 WHEN size($target_cuisines) = 0 THEN 3
@@ -455,12 +489,10 @@ class GraphHybridRecommender:
                     ELSE base_match_ratio >= $min_match * 0.2
                 END
             )
-        // Filter allergies: only filter if recipe contains ALL user's allergies (very strict)
-        // This allows recipes with some allergens if they don't have all of them
-        AND NOT (size([ing IN all_ing WHERE ing IN allergies]) = size($allergies) AND size($allergies) > 0)
-        // Filter out recipes that only match herbs/spices (avoid recommending based solely on herbs/spices)
-        // Apply this filter only when match ratio is very low (< 0.2) and matches are herbs/spices only
-        AND NOT (base_match_ratio < 0.2 AND protein_match_count = 0 AND carbo_match_count = 0 AND vegetable_match_count = 0 AND herb_spice_match_count > 0)
+        // Filter allergies: filter if recipe contains ANY user's allergies (strict)
+        // This ensures user safety by filtering out any recipe with allergens
+        AND NOT (size([ing IN all_ing WHERE ing IN allergies]) > 0)
+        // Herb/Spice Only Filter: REMOVED - allow all recipes regardless of ingredient types
         WITH u, fav_cuisines, liked_recipes, r, matched_ing, all_ing, 
             base_match_ratio, importance_bonus,
             protein_match_count, carbo_match_count, vegetable_match_count,
@@ -484,10 +516,10 @@ class GraphHybridRecommender:
             protein_match_count, carbo_match_count, vegetable_match_count,
             all_ing, interacted_recipe, iv_inter,
             exact_match_count, base_match_count, synonym_match_count,
-            // Interaction weight (like > cook > view)
+            // Interaction weight (like > rating > view)
             CASE 
                 WHEN iv_inter.event_type = 'like' THEN 3.0
-                WHEN iv_inter.event_type = 'cook' THEN 2.0
+                WHEN iv_inter.event_type = 'rating' THEN 2.0
                 WHEN iv_inter.event_type = 'view' THEN 1.0
                 ELSE 0.5
             END AS interaction_weight,
@@ -516,7 +548,15 @@ class GraphHybridRecommender:
             ), 0.0) AS history_score,
             // Count distinct interacted recipes that are similar
             coalesce(count(DISTINCT CASE WHEN shared_ing_count > 0 OR shared_cuisine > 0 THEN interacted_recipe ELSE NULL END), 0) AS similar_interacted_count,
-            exact_match_count, base_match_count, synonym_match_count
+            exact_match_count, base_match_count, synonym_match_count,
+            // Serendipity Score: Boost recipes with moderate similarity (not too similar, not too different)
+            // Sweet spot: 0.3 < match_ratio < 0.7 = serendipitous (surprising but relevant)
+            CASE
+                WHEN match_ratio >= 0.3 AND match_ratio <= 0.7 THEN 1.0  // Perfect serendipity
+                WHEN match_ratio > 0.7 AND match_ratio <= 0.8 THEN 0.5  // Slightly too similar
+                WHEN match_ratio > 0.2 AND match_ratio < 0.3 THEN 0.3    // Slightly too different
+                ELSE 0.0  // Too similar (>0.8) or too different (<0.2)
+            END AS serendipity_score
             
         // --- Step 6️⃣: Reasoning flags ---
         WITH u, fav_cuisines, liked_recipes, r, matched_ing, missing_ing, match_ratio, cuisine_priority,
@@ -648,8 +688,10 @@ class GraphHybridRecommender:
             (max_text_sim >= 0.6) AS text_similar,
             exact_match_count, base_match_count, synonym_match_count
         // --- Step 9️⃣: Rating & popularity ---
+        // Re-match user to check interactions
+        MATCH (u:User {user_id:$uid})
         OPTIONAL MATCH (r)<-[iv:INTERACTED_WITH]-(:User)
-        WITH r, matched_ing, missing_ing, match_ratio, cuisine_priority,
+        WITH u, r, matched_ing, missing_ing, match_ratio, cuisine_priority,
             matches_user_meal_choice, time_preference_score,
             base_match_ratio, importance_bonus,
             protein_match_count, carbo_match_count, vegetable_match_count,
@@ -657,12 +699,22 @@ class GraphHybridRecommender:
             has_protein_match, has_carbo_match, has_protein_and_carbo,
             matches_cuisine,
             history_score, similar_interacted_count, similar_to_history,
-            similar_users, demo_signal, text_similar,
+            similar_users, demo_signal, text_similar, serendipity_score,
             coalesce(toFloat(r.rating_value), 0.0) AS avg_rating,
             coalesce(toInteger(r.rating_count), 0) AS rating_count,
             sum(CASE WHEN iv.event_type='like' THEN 1 ELSE 0 END) AS like_count,
             sum(CASE WHEN iv.event_type='view' THEN 1 ELSE 0 END) AS view_count,
-            exact_match_count, base_match_count, synonym_match_count
+            exact_match_count, base_match_count, synonym_match_count,
+            // Popular But Not Interacted Boost: Boost popular recipes user hasn't tried
+            // This encourages discovery of well-liked recipes outside user's comfort zone
+            // Check if user has interacted with this recipe
+            EXISTS((u)-[:INTERACTED_WITH]->(r)) AS user_has_interacted,
+            CASE
+                WHEN NOT EXISTS((u)-[:INTERACTED_WITH]->(r)) AND like_count > 50 AND avg_rating >= 4.5 THEN 1.5  // Very popular, unexplored
+                WHEN NOT EXISTS((u)-[:INTERACTED_WITH]->(r)) AND like_count > 20 AND avg_rating >= 4.0 THEN 1.2  // Popular, unexplored
+                WHEN NOT EXISTS((u)-[:INTERACTED_WITH]->(r)) AND like_count > 10 AND avg_rating >= 3.5 THEN 1.1  // Somewhat popular, unexplored
+                ELSE 1.0  // Already interacted or not popular enough
+            END AS popular_unexplored_boost
 
         // --- Step 🔟: Build reasoning explanations ---
         WITH r, matched_ing, missing_ing, match_ratio, cuisine_priority,
@@ -673,7 +725,7 @@ class GraphHybridRecommender:
             has_protein_match, has_carbo_match, has_protein_and_carbo,
             matches_cuisine,
             history_score, similar_interacted_count, similar_to_history,
-            similar_users, demo_signal, text_similar,
+            similar_users, demo_signal, text_similar, serendipity_score, popular_unexplored_boost,
             avg_rating, like_count, view_count,
             exact_match_count, base_match_count, synonym_match_count,
             [reason IN [
@@ -737,6 +789,8 @@ class GraphHybridRecommender:
         ORDER BY 
             match_ratio DESC,                    // ✅ Highest priority: ingredient match ratio
             exact_match_count DESC,              // Prioritize exact ingredient matches
+            popular_unexplored_boost DESC,       // ✅ Boost popular unexplored recipes (anti-filter bubble)
+            serendipity_score DESC,              // ✅ Boost serendipitous recipes (surprising but relevant)
             cuisine_priority ASC,                // ✅ Second priority: cuisine preference
             matches_user_meal_choice DESC,       // ✅ Third priority: matches user's meal choice (if provided)
             time_preference_score DESC,           // ✅ Fourth priority: matches user's time preference (if provided)
@@ -758,7 +812,9 @@ class GraphHybridRecommender:
                 recipe_category=recipe_category,
                 target_cuisines=target_cuisines,
                 cuisine_counts=cuisine_counts,
-                diversity_threshold=cuisine_diversity_threshold,
+                diversity_threshold_view=cuisine_diversity_threshold.get("view", 20),
+                diversity_threshold_like=cuisine_diversity_threshold.get("like", 15),
+                diversity_threshold_rating=cuisine_diversity_threshold.get("rating", 10),
                 min_match=min_match_ratio,
                 lim=limit,
                 input_bases=match_bases,
@@ -793,6 +849,11 @@ class GraphHybridRecommender:
         if isinstance(target_cuisines, str):
             target_cuisines = [c.strip() for c in target_cuisines.split(",")]
         target_cuisines = [c.lower() for c in target_cuisines if c]
+        
+        # Handle "All" = "No Preference": if "all" is in the list, treat as no preference (empty list)
+        # This allows frontend to send "All" to indicate no cuisine preference
+        if "all" in target_cuisines:
+            target_cuisines = []  # No preference - show all cuisines
         match_bases = []
         match_synonyms = []
         if ingredient_match_context:
@@ -811,7 +872,7 @@ class GraphHybridRecommender:
             END AS match_type
         WHERE match_type IS NOT NULL
         AND ($max_cook_time IS NULL OR
-            coalesce(r.total_time_min, r.cook_time_min, r.prep_time_min, 999999) <= $max_cook_time)
+            coalesce(r.cook_time_min, 999999) <= $max_cook_time)
         AND ($recipe_category IS NULL OR 
             r.recipe_category = $recipe_category OR
             toLower(r.recipe_category) = toLower($recipe_category) OR

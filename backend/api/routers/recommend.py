@@ -29,11 +29,18 @@ async def post_recommend(req: RecommendRequest):
     - ingredient_names: List of ingredient names (will be mapped to IDs)
     - max_cook_time: Maximum cooking time in minutes
     - recipe_category: Filter by recipe category/meal type (use 'no preference'/'none'/'all' for no filter)
-    - preferred_cuisines: List of preferred cuisines for priority ranking
+    - preferred_cuisines: List of preferred cuisines for priority ranking (use "All" for no preference)
     - limit: Maximum number of results
     - min_match_ratio: Minimum Jaccard match ratio (default: 0.6)
     """
     try:
+        # Normalize preferred_cuisines: "All" = None (no preference)
+        normalized_preferred_cuisines = req.preferred_cuisines
+        if normalized_preferred_cuisines:
+            # Check if "All" is in the list (case-insensitive)
+            if any(c.strip().lower() == "all" for c in normalized_preferred_cuisines):
+                normalized_preferred_cuisines = None  # No preference
+        
         # Log request for debugging
         print(f"🔍 Recommendation request received:")
         print(f"  - user_id: {req.user_id}")
@@ -42,6 +49,8 @@ async def post_recommend(req: RecommendRequest):
         print(f"  - max_cook_time: {req.max_cook_time}")
         print(f"  - limit: {req.limit}")
         print(f"  - min_match_ratio: {req.min_match_ratio}")
+        print(f"  - preferred_cuisines (original): {req.preferred_cuisines}")
+        print(f"  - preferred_cuisines (normalized): {normalized_preferred_cuisines}")
         
         results = rec_impl(
             user_id=req.user_id,
@@ -50,7 +59,7 @@ async def post_recommend(req: RecommendRequest):
             limit=req.limit,
             max_cook_time=req.max_cook_time,
             recipe_category=req.recipe_category,
-            preferred_cuisines=req.preferred_cuisines,
+            preferred_cuisines=normalized_preferred_cuisines,
             min_match_ratio=req.min_match_ratio
         )
         
@@ -70,7 +79,7 @@ async def get_recommend(
     ingredient_names: Optional[str] = Query(None, description="Comma-separated ingredient names (will be mapped to IDs)"),
     max_cook_time: Optional[int] = Query(None, description="Maximum cooking time in minutes"),
     recipe_category: Optional[str] = Query(None, description="Filter by recipe category (use 'no preference'/'none'/'all' for no filter)"),
-    preferred_cuisines: Optional[str] = Query(None, description="Comma-separated preferred cuisines (e.g., 'Korean,Vietnamese,American')"),
+    preferred_cuisines: Optional[str] = Query(None, description="Comma-separated preferred cuisines (e.g., 'Korean,Vietnamese,American' or 'All' for no preference)"),
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
     min_match_ratio: float = Query(0.6, ge=0.0, le=1.0, description="Minimum Jaccard match ratio"),
 ):
@@ -83,6 +92,13 @@ async def get_recommend(
     ing_names_list = [x.strip() for x in ingredient_names.split(",")] if ingredient_names else None
     preferred_cuisines_list = [x.strip() for x in preferred_cuisines.split(",")] if preferred_cuisines else None
     
+    # Normalize preferred_cuisines: "All" = None (no preference)
+    normalized_preferred_cuisines = preferred_cuisines_list
+    if normalized_preferred_cuisines:
+        # Check if "All" is in the list (case-insensitive)
+        if any(c.strip().lower() == "all" for c in normalized_preferred_cuisines):
+            normalized_preferred_cuisines = None  # No preference
+    
     results = rec_impl(
         user_id=user_id,
         ingredient_ids=ing_list,
@@ -90,7 +106,7 @@ async def get_recommend(
         limit=limit,
         max_cook_time=max_cook_time,
         recipe_category=recipe_category,
-        preferred_cuisines=preferred_cuisines_list,
+        preferred_cuisines=normalized_preferred_cuisines,
         min_match_ratio=min_match_ratio
     )
     return {"results": results, "total": len(results)}

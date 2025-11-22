@@ -357,7 +357,7 @@ const Onboarding: React.FC = () => {
         locale: 'vi-VN',
         skill_level: 'intermediate',
         max_cook_time: maxCookTime,
-        dietary_preferences: mealTypeName ? [mealTypeName] : [],  // Store meal type in dietary_preferences
+        meal_preferences: mealTypeName ? [mealTypeName] : [],  // Store meal type in meal_preferences
         completed_onboarding: true  // Mark onboarding as completed in database
       };
 

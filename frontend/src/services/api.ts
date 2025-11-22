@@ -373,6 +373,25 @@ class ApiService {
       };
     }
   }
+
+  // Admin endpoints
+  async triggerComputeFeatures(): Promise<ApiResponse<{ message: string; status: string; note?: string }>> {
+    return this.request<{ message: string; status: string; note?: string }>(
+      API_ENDPOINTS.ADMIN_COMPUTE_FEATURES,
+      {
+        method: 'POST',
+      }
+    );
+  }
+
+  async getComputeFeaturesStatus(): Promise<ApiResponse<{ status: string; note?: string }>> {
+    return this.request<{ status: string; note?: string }>(
+      API_ENDPOINTS.ADMIN_COMPUTE_FEATURES_STATUS,
+      {
+        method: 'GET',
+      }
+    );
+  }
 }
 
 export const apiService = new ApiService();

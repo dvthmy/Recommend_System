@@ -12,11 +12,12 @@ export interface UserProfile {
   username?: string;
   name?: string;
   age?: number;
+  age_group?: string;  // Auto-calculated from age (e.g., "18-30", "30-34", "35-44", "45-54", "55+", "<18")
   gender?: string;
   locale?: string;
   skill_level?: string;
   max_cook_time?: number;
-  dietary_preferences?: string[];
+  meal_preferences?: string[];
   completed_onboarding?: boolean;  // Track if user completed onboarding
   created_at?: string;
   updated_at?: string;
@@ -32,7 +33,7 @@ export interface UserProfileUpdate {
   locale?: string;
   skill_level?: string;
   max_cook_time?: number;
-  dietary_preferences?: string[];
+  meal_preferences?: string[];
   completed_onboarding?: boolean;  // Track if user completed onboarding
 }
 

@@ -701,7 +701,7 @@ def import_survey(csv_path: str, uri: str, user: str, password: str, database: O
                             u.max_cook_time=coalesce($max_time,u.max_cook_time),
                             u.gender=coalesce($gender,u.gender),
                             u.age_group=coalesce($age_group,u.age_group),
-                            u.dietary_preferences=CASE WHEN size($diet)>0 THEN $diet ELSE coalesce(u.dietary_preferences,[]) END,
+                            u.meal_preferences=CASE WHEN size($diet)>0 THEN $diet ELSE coalesce(u.meal_preferences,[]) END,
                             u.locale=coalesce(u.locale,'vi-VN')
                         """,
                         uid=user_id, name=name, email=email, skill=skill, max_time=max_time, diet=dietary_prefs,

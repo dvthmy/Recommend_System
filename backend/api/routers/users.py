@@ -24,6 +24,21 @@ def write_backup(data):
     with open(BACKUP_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+def calculate_age_group(age: int) -> str:
+    """Calculate age_group from age number"""
+    if age < 18:
+        return "<18"
+    elif 18 <= age <= 30:
+        return "18-30"
+    elif 31 <= age <= 34:
+        return "30-34"
+    elif 35 <= age <= 44:
+        return "35-44"
+    elif 45 <= age <= 54:
+        return "45-54"
+    else:  # age >= 55
+        return "55+"
+
 # ---------- Core routes ----------
 @router.get("/{user_id}/profile", response_model=UserProfile)
 async def get_user_profile(user_id: str):
@@ -31,8 +46,8 @@ async def get_user_profile(user_id: str):
     q = """
     MATCH (u:User {user_id:$user_id})
     RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age,
-           u.gender AS gender, u.max_cook_time AS max_cook_time,
-           coalesce(u.dietary_preferences, []) AS dietary_preferences,
+           u.age_group AS age_group, u.gender AS gender, u.max_cook_time AS max_cook_time,
+           coalesce(u.meal_preferences, []) AS meal_preferences,
            u.completed_onboarding AS completed_onboarding,
            u.created_at AS created_at, u.updated_at AS updated_at
     """
@@ -44,6 +59,7 @@ async def get_user_profile(user_id: str):
             # Ensure all fields are present (set None for missing fields)
             profile.setdefault("username", None)
             profile.setdefault("age", None)
+            profile.setdefault("age_group", None)
             profile.setdefault("gender", None)
             
             # Convert Neo4j DateTime objects to Python datetime objects
@@ -155,6 +171,10 @@ async def update_user_profile(user_id: str, update: UserProfileUpdate):
     if update.age is not None:
         fields.append("u.age = $age")
         params["age"] = update.age
+        # Auto-calculate age_group when age is updated
+        age_group = calculate_age_group(update.age)
+        fields.append("u.age_group = $age_group")
+        params["age_group"] = age_group
     
     if update.gender is not None:
         fields.append("u.gender = $gender")
@@ -164,9 +184,9 @@ async def update_user_profile(user_id: str, update: UserProfileUpdate):
         fields.append("u.max_cook_time = $max_cook_time")
         params["max_cook_time"] = update.max_cook_time
     
-    if update.dietary_preferences is not None:
-        fields.append("u.dietary_preferences = $dietary_preferences")
-        params["dietary_preferences"] = update.dietary_preferences
+    if update.meal_preferences is not None:
+        fields.append("u.meal_preferences = $meal_preferences")
+        params["meal_preferences"] = update.meal_preferences
     
     if update.completed_onboarding is not None:
         fields.append("u.completed_onboarding = $completed_onboarding")
@@ -183,8 +203,8 @@ async def update_user_profile(user_id: str, update: UserProfileUpdate):
     MATCH (u:User {{user_id:$user_id}})
     SET {set_clause}
     RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age,
-           u.gender AS gender, u.max_cook_time AS max_cook_time,
-           coalesce(u.dietary_preferences, []) AS dietary_preferences,
+           u.age_group AS age_group, u.gender AS gender, u.max_cook_time AS max_cook_time,
+           coalesce(u.meal_preferences, []) AS meal_preferences,
            u.completed_onboarding AS completed_onboarding,
            u.created_at AS created_at, u.updated_at AS updated_at
     """
@@ -192,6 +212,20 @@ async def update_user_profile(user_id: str, update: UserProfileUpdate):
         rec = s.run(q, **params).single()
         if not rec:
             raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+        
+        # Update BELONGS_TO relationship if gender or age_group changed
+        # Get current gender and age_group from updated user
+        user_info = s.run("""
+            MATCH (u:User {user_id: $user_id})
+            RETURN u.gender AS gender, u.age_group AS age_group
+        """, user_id=user_id).single()
+        
+        if user_info and user_info.get("gender") and user_info.get("age_group"):
+            s.run("""
+                MATCH (u:User {user_id: $user_id})
+                MERGE (g:Group {gender: $gender, age_group: $age_group})
+                MERGE (u)-[:BELONGS_TO]->(g)
+            """, user_id=user_id, gender=user_info["gender"], age_group=user_info["age_group"])
 
         # 🧠 Backup user info
         data = read_backup()

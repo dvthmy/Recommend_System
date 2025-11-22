@@ -13,6 +13,21 @@ def hash_password(password: str) -> str:
     """Simple password hashing using SHA256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
+def calculate_age_group(age: int) -> str:
+    """Calculate age_group from age number"""
+    if age < 18:
+        return "<18"
+    elif 18 <= age <= 30:
+        return "18-30"
+    elif 31 <= age <= 34:
+        return "30-34"
+    elif 35 <= age <= 44:
+        return "35-44"
+    elif 45 <= age <= 54:
+        return "45-54"
+    else:  # age >= 55
+        return "55+"
+
 @router.post("/signup", response_model=UserProfile)
 async def signup(request: SignUpRequest):
     """Sign up a new user with username, password, age, and gender"""
@@ -31,6 +46,9 @@ async def signup(request: SignUpRequest):
         if existing:
             raise HTTPException(status_code=400, detail="Username already exists")
         
+        # Calculate age_group from age
+        age_group = calculate_age_group(request.age) if request.age else None
+        
         # Create new user
         create_q = """
         CREATE (u:User {
@@ -39,18 +57,19 @@ async def signup(request: SignUpRequest):
             name: $name,
             password_hash: $password_hash,
             age: $age,
+            age_group: $age_group,
             gender: $gender,
             locale: $locale,
             skill_level: $skill_level,
             max_cook_time: $max_time,
-            dietary_preferences: $dp,
+            meal_preferences: $dp,
             completed_onboarding: $completed_onboarding,
             created_at: $now,
             updated_at: $now
         })
         RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age, 
-               u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
-               u.max_cook_time AS max_cook_time, u.dietary_preferences AS dietary_preferences,
+               u.age_group AS age_group, u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
+               u.max_cook_time AS max_cook_time, u.meal_preferences AS meal_preferences,
                u.completed_onboarding AS completed_onboarding,
                u.created_at AS created_at, u.updated_at AS updated_at
         """
@@ -62,6 +81,7 @@ async def signup(request: SignUpRequest):
             name=request.name,
             password_hash=password_hash,
             age=request.age,
+            age_group=age_group,
             gender=request.gender,
             locale="vi-VN",
             skill_level="beginner",
@@ -73,6 +93,14 @@ async def signup(request: SignUpRequest):
         
         if not rec:
             raise HTTPException(status_code=500, detail="Failed to create user")
+        
+        # Create BELONGS_TO relationship if gender and age_group are available
+        if request.gender and age_group:
+            s.run("""
+                MATCH (u:User {user_id: $uid})
+                MERGE (g:Group {gender: $gender, age_group: $age_group})
+                MERGE (u)-[:BELONGS_TO]->(g)
+            """, uid=uid, gender=request.gender, age_group=age_group)
         
         user_data = dict(rec)
         
@@ -94,8 +122,9 @@ async def signin(request: SignInRequest):
     q = """
     MATCH (u:User {username: $username, password_hash: $password_hash})
     RETURN u.user_id AS user_id, u.username AS username, u.name AS name, u.age AS age,
-           u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
-           u.max_cook_time AS max_cook_time, u.dietary_preferences AS dietary_preferences,
+           u.age_group AS age_group, u.gender AS gender, u.locale AS locale, u.skill_level AS skill_level,
+           u.max_cook_time AS max_cook_time, u.meal_preferences AS meal_preferences,
+           u.completed_onboarding AS completed_onboarding,
            u.created_at AS created_at, u.updated_at AS updated_at
     """
     

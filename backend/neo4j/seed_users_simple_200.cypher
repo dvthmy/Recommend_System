@@ -12,7 +12,7 @@ WITH idx, allIngredientIds,
 
 // Create user with basic properties
 MERGE (u:User {user_id: 'u_' + toString(idx)})
-SET u.dietary_preferences = CASE WHEN r1 < 0.10 THEN ['vegetarian'] WHEN r1 < 0.15 THEN ['vegan'] ELSE [] END,
+SET u.meal_preferences = CASE WHEN r1 < 0.10 THEN ['vegetarian'] WHEN r1 < 0.15 THEN ['vegan'] ELSE [] END,
     u.allergies = [],
     u.disliked_ingredients = [],
     u.skill_level = CASE WHEN r2 < 0.50 THEN 'beginner' WHEN r2 < 0.85 THEN 'intermediate' ELSE 'advanced' END,

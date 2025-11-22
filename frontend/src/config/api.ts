@@ -40,6 +40,10 @@ export const API_ENDPOINTS = {
   
   // Detection
   DETECT: '/detect',
+  
+  // Admin
+  ADMIN_COMPUTE_FEATURES: '/admin/compute-features',
+  ADMIN_COMPUTE_FEATURES_STATUS: '/admin/compute-features/status',
 };
 
 // Request Headers

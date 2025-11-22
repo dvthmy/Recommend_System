@@ -7,11 +7,12 @@ class UserProfile(BaseModel):
     username: Optional[str] = None
     name: Optional[str] = None
     age: Optional[int] = None
+    age_group: Optional[str] = None  # Auto-calculated from age (e.g., "18-30", "30-34")
     gender: Optional[str] = None
     locale: Optional[str] = None
     skill_level: Optional[str] = None
     max_cook_time: Optional[int] = Field(None, ge=1, le=480)
-    dietary_preferences: Optional[List[str]] = None
+    meal_preferences: Optional[List[str]] = None
     completed_onboarding: Optional[bool] = False  # Track if user completed onboarding
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -26,7 +27,7 @@ class UserProfileUpdate(BaseModel):
     locale: Optional[str] = None
     skill_level: Optional[str] = None
     max_cook_time: Optional[int] = Field(None, ge=1, le=480)
-    dietary_preferences: Optional[List[str]] = None
+    meal_preferences: Optional[List[str]] = None
     completed_onboarding: Optional[bool] = None  # Track if user completed onboarding
 
 class SignUpRequest(BaseModel):

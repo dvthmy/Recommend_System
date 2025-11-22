@@ -108,8 +108,14 @@ def build_user_profile(tx):
           AND size(r.text_terms) = size(r.text_weights)
     WITH u, iv, r
     WITH u, r,
-         CASE iv.event_type WHEN 'cook' THEN 1.0 WHEN 'save' THEN 0.6 ELSE 0.3 END AS w,
-         duration.between(datetime(iv.timestamp), datetime()).days AS daysAgo
+         CASE iv.event_type 
+            WHEN 'like' THEN 1.0 
+            WHEN 'rating' THEN 0.8 
+            WHEN 'view' THEN 0.2 
+            ELSE 0.1 
+         END AS w,
+         coalesce(iv.updated_at, iv.created_at, datetime()) AS interaction_time
+    WITH u, w, duration.between(interaction_time, datetime()).days AS daysAgo, r
     WITH u, w * exp(-log(2) * toFloat(daysAgo) / 90.0) AS weight, r
     WITH u, weight, r, range(0, size(r.text_terms)-1) AS idxs
     UNWIND idxs AS k

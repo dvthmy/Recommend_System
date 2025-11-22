@@ -286,9 +286,9 @@ const FoodSuggestions: React.FC = () => {
         })
         .filter(name => name.length > 0);
 
-      // Get meal type from user preferences (stored in dietary_preferences)
-      const mealType = user.dietary_preferences && user.dietary_preferences.length > 0 
-        ? user.dietary_preferences[0] 
+      // Get meal type from user preferences (stored in meal_preferences)
+      const mealType = user.meal_preferences && user.meal_preferences.length > 0 
+        ? user.meal_preferences[0] 
         : undefined;
 
       // Get preferred cuisines from user's favorite cuisines

@@ -110,7 +110,7 @@ ON EACH [i.canonical_name, i.alt_names];
 //   password_hash: string,          // Hashed password
 //   age: integer,
 //   gender: string,
-//   dietary_preferences: list<string>,
+//   meal_preferences: list<string>,
 //   allergies: list<string>, // ingredient_ids (denormalized)
 //   disliked_ingredients: list<string>, // ingredient_ids (denormalized)
 //   explicit_preferences: { fav_cuisines: list<string>, fav_tags: list<string>, disliked_cuisines: list<string> },

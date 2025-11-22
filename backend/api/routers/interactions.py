@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 from ..db import get_session
+from ..services.user_profile import update_user_profile_incremental
 
 router = APIRouter(prefix="/users", tags=["Interactions"])
 
@@ -19,7 +20,11 @@ class InteractionRequest(BaseModel):
 # 🧩 POST — Record user actions (view / like / rating)
 # ========================
 @router.post("/{user_id}/interactions", summary="Record or update an interaction (view/like/rating)")
-async def record_interaction(user_id: str, body: InteractionRequest):
+async def record_interaction(
+    user_id: str, 
+    body: InteractionRequest, 
+    background_tasks: BackgroundTasks
+):
     with get_session() as s:
         # Check user & recipe
         if not s.run("MATCH (u:User {user_id:$uid}) RETURN u", uid=user_id).single():
@@ -56,6 +61,9 @@ async def record_interaction(user_id: str, body: InteractionRequest):
             """
             result = s.run(q, uid=user_id, rid=body.recipe_id).single()
             if result:
+                # ✅ Trigger incremental profile update
+                background_tasks.add_task(update_user_profile_incremental, user_id)
+                
                 return {
                     "message": "View recorded 👁️",
                     "user_view_count": result["total_views"],
@@ -107,20 +115,28 @@ async def record_interaction(user_id: str, body: InteractionRequest):
                 RETURN r.popularity_likes AS recipe_likes
                 """
                 result = s.run(q_unlike, uid=user_id, rid=body.recipe_id).single()
+                
+                # ✅ Trigger incremental profile update
+                background_tasks.add_task(update_user_profile_incremental, user_id)
+                
                 return {"message": "Unliked 💔", "liked": False, "recipe_likes": result["recipe_likes"]}
             else:
                 # Like: set liked=true and increment
                 q_like = """
                 MATCH (u:User {user_id:$uid})-[rel:INTERACTED_WITH]->(r:Recipe {recipe_id:$rid})
                 SET rel.event_type = 'like',
-                    rel.liked = true,
-                    rel.like_time = datetime(),
-                    rel.timestamp = datetime()
+                rel.liked = true,
+                rel.like_time = datetime(),
+                rel.timestamp = datetime()
                 WITH r
                 SET r.popularity_likes = coalesce(r.popularity_likes, 0) + 1
                 RETURN r.popularity_likes AS recipe_likes
                 """
                 result = s.run(q_like, uid=user_id, rid=body.recipe_id).single()
+                
+                # ✅ Trigger incremental profile update
+                background_tasks.add_task(update_user_profile_incremental, user_id)
+                
                 return {"message": "Liked ❤️", "liked": True, "recipe_likes": result["recipe_likes"]}
 
         # ===================
@@ -136,12 +152,22 @@ async def record_interaction(user_id: str, body: InteractionRequest):
                 rel.rating = $rating,
                 rel.rating_time = datetime(),
                 rel.timestamp = datetime()
-            WITH r, collect(rel.rating) AS all_ratings
-            SET r.rating_count = size(all_ratings),
-                r.rating_value = round(reduce(total=0, x IN all_ratings | total + x) / size(all_ratings), 2)
+            
+            // Re-calculate average rating for the recipe
+            WITH r, rel
+            MATCH (r)<-[all_rels:INTERACTED_WITH]-(:User)
+            WHERE all_rels.rating IS NOT NULL
+            WITH r, rel, avg(all_rels.rating) AS new_avg, count(all_rels) AS new_count
+            SET r.rating_value = round(new_avg, 2),
+                r.rating_count = new_count
+            
             RETURN rel.rating AS rating, r.rating_value AS avg_rating, r.rating_count AS count
             """
             result = s.run(q, uid=user_id, rid=body.recipe_id, rating=body.rating).single()
+            
+            # ✅ Trigger incremental profile update
+            background_tasks.add_task(update_user_profile_incremental, user_id)
+            
             return {
                 "message": "Rating updated ⭐",
                 "user_rating": result["rating"],
