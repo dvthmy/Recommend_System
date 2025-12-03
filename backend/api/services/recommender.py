@@ -18,15 +18,79 @@ except Exception as e:
     _recommender_class = None
 
 
+def _filter_allergic_recipes(user_id: Optional[str], recs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Post-filter recommendations to remove recipes that contain ingredients
+    the user is allergic to.
+
+    This is a safety net on top of any filtering done inside the recommender
+    graph logic. It only runs when user_id is provided.
+    """
+    if not user_id or not recs:
+        return recs
+
+    try:
+        from ..db import get_session
+
+        recipe_ids = [r.get("recipe_id") for r in recs if r.get("recipe_id")]
+        if not recipe_ids:
+            return recs
+
+        with get_session() as s:
+            # Get all allergic ingredient_ids for this user
+            allergic_ids = [
+                row["ingredient_id"]
+                for row in s.run(
+                    """
+                    MATCH (u:User {user_id:$uid})-[:ALLERGIC_TO]->(i:Ingredient)
+                    RETURN i.ingredient_id AS ingredient_id
+                    """,
+                    uid=user_id,
+                )
+                if row.get("ingredient_id")
+            ]
+
+            if not allergic_ids:
+                return recs
+
+            # Find recipes that contain any allergic ingredient
+            rows = s.run(
+                """
+                MATCH (r:Recipe)-[:HAS_INGREDIENT]->(i:Ingredient)
+                WHERE r.recipe_id IN $recipe_ids AND i.ingredient_id IN $allergic_ids
+                RETURN DISTINCT r.recipe_id AS recipe_id
+                """,
+                recipe_ids=recipe_ids,
+                allergic_ids=allergic_ids,
+            )
+            banned_ids = {row["recipe_id"] for row in rows if row.get("recipe_id")}
+
+        if not banned_ids:
+            return recs
+
+        filtered = [r for r in recs if r.get("recipe_id") not in banned_ids]
+        logger.info(
+            "Allergy filter: removed %d recipes (remaining %d) for user %s",
+            len(recs) - len(filtered),
+            len(filtered),
+            user_id,
+        )
+        return filtered
+    except Exception as e:
+        logger.error("Allergy post-filter failed: %s", e, exc_info=True)
+        # Fail-open: if filtering fails, return original recs rather than crashing
+        return recs
+
+
 def recommend(
     user_id: Optional[str],
     ingredient_ids: Optional[List[str]],
-    limit: int = 10,
+    limit: int = 20,
     max_cook_time: Optional[int] = None,
     recipe_category: Optional[str] = None,
     preferred_cuisines: Optional[List[str]] = None,
     ingredient_names: Optional[List[str]] = None,
-    min_match_ratio: float = 0.6,
+    min_match_ratio: float = 0.3,
 ) -> List[Dict[str, Any]]:
     """
     Facade that calls GraphHybridRecommender from recommend_graph.py.
@@ -72,12 +136,13 @@ def recommend(
                 min_match_ratio=min_match_ratio,
                 max_cook_time=max_cook_time,
                 recipe_category=recipe_category,
-                preferred_cuisines=preferred_cuisines
+                preferred_cuisines=preferred_cuisines,
             )
-            
+
             print(f"✅ recommend() returned {len(results)} results", file=sys.stderr)
             recommender.close()
-            return results
+            # Safety allergy filter in case graph logic didn't exclude them
+            return _filter_allergic_recipes(user_id, results)
         except Exception as e:
             import traceback
             error_msg = f"Error in GraphHybridRecommender: {e}"
@@ -91,16 +156,20 @@ def recommend(
     logger.warning("Using fallback recommendation query")
     from ..db import get_session
     q = """
+    // Base recipe match
     MATCH (r:Recipe)
+    // Optional: load user allergies (if user_id provided)
+    OPTIONAL MATCH (u:User {user_id:$user_id})-[:ALLERGIC_TO]->(a:Ingredient)
+    WITH r, collect(DISTINCT a.ingredient_id) AS allergic_ids
     WHERE ($max_cook_time IS NULL OR 
            coalesce(r.total_time_min, r.cook_time_min, r.prep_time_min, 999999) <= $max_cook_time)
     AND ($recipe_category IS NULL OR 
          r.recipe_category = $recipe_category OR
          toLower(r.recipe_category) = toLower($recipe_category) OR
          toLower(r.recipe_category) CONTAINS toLower($recipe_category))
-    WITH r
+    // Collect recipe ingredients
     OPTIONAL MATCH (r)-[:HAS_INGREDIENT]->(i:Ingredient)
-    WITH r, collect(i.ingredient_id) AS all_ing
+    WITH r, allergic_ids, collect(i.ingredient_id) AS all_ing
     WITH r, all_ing,
          CASE WHEN $ingredient_ids IS NULL OR size($ingredient_ids)=0 THEN 0.0
               ELSE toFloat(size([x IN all_ing WHERE x IN $ingredient_ids])) /
@@ -110,6 +179,13 @@ def recommend(
          [x IN all_ing WHERE NOT x IN $ingredient_ids] AS missing_ing,
          size(all_ing) AS ing_count
     WHERE 
+        // ❌ Exclude recipes that contain allergic ingredients for this user (if any)
+        (
+          allergic_ids IS NULL OR 
+          size(allergic_ids) = 0 OR 
+          size([ing IN all_ing WHERE ing IN allergic_ids]) = 0
+        )
+        AND
         // Absolute minimum: must match at least 1 ingredient (or 2 if user provided 4+ ingredients)
         size(matched_ing) >= CASE WHEN size($ingredient_ids) >= 4 THEN 2 ELSE 1 END
         AND (
@@ -135,6 +211,19 @@ def recommend(
            coalesce(r.cuisine, []) AS cuisine,
            coalesce(r.tags, []) AS tags,
            r.recipe_category AS recipe_category,
+           // Normalize meal type to 4 standard categories: Breakfast, Lunch, Dinner, Snack
+           CASE 
+               WHEN r.recipe_category IS NULL OR r.recipe_category = '' THEN 'Dinner'  // Default
+               WHEN toLower(r.recipe_category) CONTAINS 'breakfast' OR 
+                    toLower(r.recipe_category) CONTAINS 'brunch' OR 
+                    toLower(r.recipe_category) CONTAINS 'tea time' THEN 'Breakfast'
+               WHEN toLower(r.recipe_category) CONTAINS 'lunch' THEN 'Lunch'
+               WHEN toLower(r.recipe_category) CONTAINS 'dinner' THEN 'Dinner'
+               WHEN toLower(r.recipe_category) CONTAINS 'snack' OR 
+                    toLower(r.recipe_category) CONTAINS 'appetizer' OR 
+                    toLower(r.recipe_category) CONTAINS 'dessert' THEN 'Snack'
+               ELSE 'Dinner'  // Default fallback
+           END AS meal,
            round(jaccard * 100, 1) AS match_percent,
            r.cook_time_min AS cook_time_min,
            r.prep_time_min AS prep_time_min,
@@ -150,12 +239,17 @@ def recommend(
     LIMIT $limit
     """
     with get_session() as s:
-        recs = [dict(r) for r in s.run(
-            q, 
-            limit=limit, 
-            ingredient_ids=ingredient_ids or [], 
-            max_cook_time=max_cook_time,
-            recipe_category=recipe_category,
-            min_match=min_match_ratio
-        )]
-        return recs
+        recs = [
+            dict(r)
+            for r in s.run(
+                q,
+                limit=limit,
+                ingredient_ids=ingredient_ids or [],
+                max_cook_time=max_cook_time,
+                recipe_category=recipe_category,
+                min_match=min_match_ratio,
+                user_id=user_id,
+            )
+        ]
+        # Allergy safety filter applied here as well
+        return _filter_allergic_recipes(user_id, recs)

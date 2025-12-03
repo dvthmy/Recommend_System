@@ -21,9 +21,12 @@ import {
   UserAllergiesResponse,
   UserDislikesResponse,
   UserCuisinesResponse,
+  UserDietsResponse,
   AllergyUpdateRequest,
   DislikeUpdateRequest,
   CuisinePreferenceRequest,
+  DietRequest,
+  DietsUpdate,
   IngredientsResponse,
   CuisinesResponse,
   HealthCheckResponse,
@@ -159,7 +162,8 @@ class ApiService {
 
   // Ingredients
   async getIngredients(): Promise<ApiResponse<IngredientsResponse>> {
-    return this.request<IngredientsResponse>('/ingredients');
+    // Request maximum ingredients (200 is the backend limit)
+    return this.request<IngredientsResponse>('/ingredients?limit=200');
   }
 
   async getIngredientDetail(ingredient_id: string): Promise<ApiResponse<IngredientDetail>> {
@@ -200,6 +204,41 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(profile),
     });
+  }
+
+  async uploadAvatar(user_id: string, file: File): Promise<ApiResponse<{ message: string; user_id: string; avatar_url: string }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = this.getAuthToken();
+    const url = `${API_CONFIG.BASE_URL}/users/${user_id}/avatar`;
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    // Don't set Content-Type for FormData - browser will set it with boundary
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          error: errorText || `HTTP ${response.status}: ${response.statusText}`,
+        };
+      }
+
+      const data = await response.json();
+      return { data };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : ERROR_MESSAGES.NETWORK_ERROR,
+      };
+    }
   }
 
   // User Allergies
@@ -258,6 +297,31 @@ class ApiService {
     });
   }
 
+  // User Diets
+  async getUserDiets(user_id: string): Promise<ApiResponse<UserDietsResponse>> {
+    return this.request<UserDietsResponse>(`/users/${user_id}/diets`);
+  }
+
+  async addUserDiet(user_id: string, request: DietRequest): Promise<ApiResponse<any>> {
+    return this.request<any>(`/users/${user_id}/diets`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async updateUserDiets(user_id: string, request: DietsUpdate): Promise<ApiResponse<any>> {
+    return this.request<any>(`/users/${user_id}/diets`, {
+      method: 'PUT',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async removeUserDiet(user_id: string, diet_name: string): Promise<ApiResponse<any>> {
+    return this.request<any>(`/users/${user_id}/diets/${diet_name}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Recipes
   async getRecipeDetail(recipe_id: string): Promise<ApiResponse<RecipeDetail>> {
     return this.request<RecipeDetail>(`/recipes/${recipe_id}`);
@@ -291,6 +355,12 @@ class ApiService {
     return this.request<any>(`/users/${user_id}/interactions`, {
       method: 'POST',
       body: JSON.stringify(request),
+    });
+  }
+
+  async removeUserRating(user_id: string, recipe_id: string): Promise<ApiResponse<any>> {
+    return this.request<any>(`/users/${user_id}/interactions/${recipe_id}/rating`, {
+      method: 'DELETE',
     });
   }
 

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import { RecipeDetail } from '../types/api';
 import { FoodSuggestion } from '../types';
+import { getUserId } from '../utils/auth';
 import { Star, Heart, Clock, Utensils } from 'lucide-react';
 import './FoodDetail.css';
 
@@ -16,6 +17,7 @@ const FoodDetail: React.FC = () => {
   const [hoveredStar, setHoveredStar] = useState<number>(0);
   const [isLiked, setIsLiked] = useState<boolean>(false);
   const [selectedIngredients, setSelectedIngredients] = useState<Set<number>>(new Set());
+  const [showFullNutrition, setShowFullNutrition] = useState<boolean>(false);
 
   useEffect(() => {
     if (id) {
@@ -48,12 +50,13 @@ const FoodDetail: React.FC = () => {
       if (response.data) {
         setRecipe(response.data);
         
-        // Load liked status
+        // Load liked status and user rating
         await loadLikedStatus(recipeId);
+        await loadUserRating(recipeId);
 
         // Only record view for registered users, not guests
         if (recordView && !isGuestUser()) {
-          const userId = localStorage.getItem('userId');
+          const userId = getUserId();
           if (userId) {
             try {
               await apiService.recordUserInteraction(userId, {
@@ -92,7 +95,7 @@ const FoodDetail: React.FC = () => {
     }
 
     // For registered users, check backend
-    const userId = localStorage.getItem('userId');
+    const userId = getUserId();
     if (!userId) {
       setIsLiked(false);
       return;
@@ -112,14 +115,49 @@ const FoodDetail: React.FC = () => {
     }
   };
 
+  const loadUserRating = async (recipeId: string) => {
+    const isGuest = isGuestUser();
+    
+    if (isGuest) {
+      setUserRating(0);
+      return;
+    }
+
+    const userId = getUserId();
+    if (!userId) {
+      setUserRating(0);
+      return;
+    }
+
+    try {
+      // Fetch user's rating interactions
+      const response = await apiService.getUserInteractions(userId, 'rating', 100, 0);
+      if (response.data && response.data.interactions) {
+        const ratingInteraction = response.data.interactions.find(
+          (interaction: any) => interaction.recipe_id === recipeId
+        );
+        
+        if (ratingInteraction && ratingInteraction.rating) {
+          setUserRating(ratingInteraction.rating);
+        } else {
+          setUserRating(0);
+        }
+      } else {
+        setUserRating(0);
+      }
+    } catch (err) {
+      console.error('Failed to load user rating:', err);
+      setUserRating(0);
+    }
+  };
+
   // Convert API recipe to FoodSuggestion format for display
   const food: FoodSuggestion | null = recipe ? {
     id: recipe.recipe_id,
     name: recipe.title,
     description: recipe.description || `Delicious ${recipe.cuisine} dish`,
-    ingredients: recipe.ingredients?.map(ing => 
-      `${ing.ingredient_name}${ing.quantity ? ` (${ing.quantity}${ing.unit || ''})` : ''}`
-    ) || [],
+    // Use ingredients_list from CSV (full string with quantity/unit)
+    ingredients: recipe.ingredients_list || [],
     cookingTime: recipe.cook_time_min ? `${recipe.cook_time_min} minutes` : 'Unknown',
     difficulty: 'Medium',
     cuisine: recipe.cuisine || 'Unknown',
@@ -146,25 +184,72 @@ const FoodDetail: React.FC = () => {
 
   const handleRate = async (rating: number) => {
     if (isGuestUser()) {
-      alert('Please sign in to rate recipes. Guest ratings are not saved.');
+      alert('Please sign in to rate recipes. Your rating will not be saved.');
       return;
     }
     
-    const userId = localStorage.getItem('userId');
+    const userId = getUserId();
     if (userId && recipe) {
       try {
+        // Submit rating to backend
         await apiService.recordUserInteraction(userId, {
           recipe_id: recipe.recipe_id,
           event_type: 'rating',
           rating: rating
         });
+        
+        // Update local state
         setUserRating(rating);
-        alert('Recipe rated successfully!');
-        loadRecipeDetail(id!, false);
+        
+        // Reload recipe to get updated average rating and count
+        await loadRecipeDetail(id!, false);
       } catch (err) {
-        console.error('Failed to rate recipe:', err);
-        alert('Failed to rate recipe');
+        console.error('❌ Failed to rate recipe:', err);
+        alert('❌ Failed to submit rating. Please try again.');
       }
+    }
+  };
+
+  const handleRemoveRating = async () => {
+    if (isGuestUser()) return;
+    
+    const userId = getUserId();
+    if (userId && recipe) {
+      try {
+        // Remove rating via DELETE endpoint
+        await apiService.removeUserRating(userId, recipe.recipe_id);
+        
+        // Update local state
+        setUserRating(0);
+        
+        // Reload recipe to get updated average rating and count
+        await loadRecipeDetail(id!, false);
+      } catch (err: any) {
+        console.error('❌ Failed to remove rating:', err);
+        
+        // Check for specific error
+        if (err?.response?.status === 404) {
+          console.warn('⚠️ No rating found, resetting UI state');
+          setUserRating(0);
+        } else {
+          alert('❌ Failed to remove rating. Please try again.');
+        }
+      }
+    }
+  };
+
+  const handleStarClick = async (starValue: number) => {
+    if (isGuestUser()) {
+      alert('Please sign in to rate recipes.');
+      return;
+    }
+
+    // If clicking the same star twice, remove rating
+    if (userRating === starValue) {
+      await handleRemoveRating();
+    } else {
+      // Submit new rating immediately
+      await handleRate(starValue);
     }
   };
 
@@ -201,7 +286,7 @@ const FoodDetail: React.FC = () => {
     }
 
     // For registered users, save to backend
-    const userId = localStorage.getItem('userId');
+    const userId = getUserId();
     if (!userId) {
       setIsLiked(!newLikedState); // Revert
       return;
@@ -226,17 +311,20 @@ const FoodDetail: React.FC = () => {
     const displayRating = interactive ? (hoveredStar || userRating) : rating;
 
     for (let i = 1; i <= 5; i++) {
-      const isFilled = i <= Math.floor(displayRating) || (i === Math.ceil(displayRating) && displayRating % 1 >= 0.5);
+      // More accurate star filling logic
+      const isFilled = i <= displayRating;
+      const isHalfFilled = !isFilled && i === Math.ceil(displayRating) && displayRating % 1 >= 0.5;
+      
       stars.push(
         <Star
           key={i}
-          className={`star ${isFilled ? 'filled' : ''}`}
+          className={`star ${isFilled || isHalfFilled ? 'filled' : ''}`}
           size={size}
-          fill={isFilled ? 'currentColor' : 'none'}
+          fill={isFilled ? 'currentColor' : isHalfFilled ? 'url(#half)' : 'none'}
           strokeWidth={1.5}
           onMouseEnter={interactive ? () => setHoveredStar(i) : undefined}
           onMouseLeave={interactive ? () => setHoveredStar(0) : undefined}
-          onClick={interactive ? () => setUserRating(i) : undefined}
+          onClick={interactive ? () => handleStarClick(i) : undefined}
           style={{ cursor: interactive ? 'pointer' : 'default' }}
         />
       );
@@ -271,7 +359,7 @@ const FoodDetail: React.FC = () => {
         <div className="container">
           <button 
             className="back-button"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/suggestions')}
           >
             ← Back
           </button>
@@ -298,7 +386,7 @@ const FoodDetail: React.FC = () => {
       <div className="container">
         <button 
           className="back-button"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/suggestions')}
         >
           ← Back
         </button>
@@ -319,12 +407,37 @@ const FoodDetail: React.FC = () => {
 
             {/* Title */}
             <h1 className="recipe-title">{food.name}</h1>
+            
+            {/* Description */}
+            <p className="food-description">
+              {recipe?.description || food.description || `A delicious ${food.cuisine} dish perfect for any occasion.`}
+            </p>
+            
+            {/* Recipe Source URL (small text below description) */}
+            {recipe?.url && (
+              <div className="recipe-source-url">
+                <a 
+                  href={recipe.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="recipe-url-link"
+                >
+                  🔗 {new URL(recipe.url).hostname}
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 10H2V2h4V1H2C1.45 1 1 1.45 1 2v8c0 .55.45 1 1 1h8c.55 0 1-.45 1-1V6h-1v4zM7 1v1h2.59L3.76 7.83l.71.71L10.3 2.71V5h1V1H7z" fill="currentColor"/>
+                  </svg>
+                </a>
+              </div>
+            )}
 
             {/* Metadata: Rating, Time, Servings */}
             <div className="recipe-metadata">
               <div className="rating-metadata">
                 <span className="rating-value">{ratingValue.toFixed(1)}</span>
-                <span className="rating-text">({ratingCount} reviews)</span>
+                <span className="rating-text">
+                  ({ratingCount} {ratingCount === 1 ? 'rating' : 'ratings'}
+                  {recipe?.review_count ? `, ${recipe.review_count} ${recipe.review_count === 1 ? 'review' : 'reviews'}` : ''})
+                </span>
                 <div className="stars-inline">
                   {renderStars(ratingValue, false, 18)}
                 </div>
@@ -332,45 +445,73 @@ const FoodDetail: React.FC = () => {
               
               <div className="time-metadata">
                 <Clock size={18} />
-                <span>{formatTime(totalTime)}</span>
+                <span>
+                  {recipe?.prep_time_min && `Prep: ${formatTime(recipe.prep_time_min)}`}
+                  {recipe?.prep_time_min && recipe?.cook_time_min && ' | '}
+                  {recipe?.cook_time_min && `Cook: ${formatTime(recipe.cook_time_min)}`}
+                  {!recipe?.prep_time_min && !recipe?.cook_time_min && formatTime(totalTime)}
+                </span>
               </div>
               
               <div className="servings-metadata">
                 <Utensils size={18} />
-                <span>{servings} Servings</span>
+                <span>
+                  {servings ? `${servings} ${servings === 1 ? 'Serving' : 'Servings'}` : ''}
+                  {recipe?.yield && (!servings || recipe.yield !== servings.toString()) && (servings ? ' | ' : '') + recipe.yield}
+                  {!servings && !recipe?.yield && 'Servings unknown'}
+                </span>
               </div>
             </div>
-
-            {/* Description */}
-            <p className="food-description">
-              {recipe?.description || food.description || `A brief, enticing paragraph about this classic, layered pasta dish. Hearty, cheesy, and packed with flavor, this traditional ${food.cuisine} dish is the ultimate comfort food, perfect for family dinners and special occasions.`}
-            </p>
+            
+            {/* User Rating Section - Below metadata */}
+            {!isGuestUser() && (
+              <div className="user-rating-section-standalone">
+                <span className="rate-prompt-inline">
+                  {userRating > 0 ? '⭐ Your rating:' : '🌟 Rate this recipe:'}
+                </span>
+                <div className="interactive-stars-inline">
+                  {renderStars(userRating, true, 24)}
+                </div>
+                {userRating > 0 && (
+                  <span className="rating-hint">Click again to remove</span>
+                )}
+              </div>
+            )}
 
             {/* Ingredients Section */}
             <div className="ingredients-section">
               <h2>Ingredients</h2>
               <div className="ingredients-list">
-                {food.ingredients.map((ingredient, index) => {
-                  const isSelected = selectedIngredients.has(index);
-                  return (
-                    <div 
-                      key={index} 
-                      className={`ingredient-item ${isSelected ? 'selected' : ''}`}
-                      onClick={() => {
-                        const newSelected = new Set(selectedIngredients);
-                        if (isSelected) {
-                          newSelected.delete(index);
-                        } else {
-                          newSelected.add(index);
-                        }
-                        setSelectedIngredients(newSelected);
-                      }}
-                    >
-                      <span className={`ingredient-checkbox ${isSelected ? 'selected' : ''}`}></span>
-                      <span className="ingredient-name">{ingredient}</span>
-                    </div>
-                  );
-                })}
+                {recipe?.ingredients_list && recipe.ingredients_list.length > 0 ? (
+                  recipe.ingredients_list.map((ingredient, index) => {
+                    const isSelected = selectedIngredients.has(index);
+                    // Ensure ingredient is a string and trim whitespace
+                    const ingredientText = typeof ingredient === 'string' 
+                      ? ingredient.trim() 
+                      : String(ingredient).trim();
+                    
+                    return (
+                      <div 
+                        key={index} 
+                        className={`ingredient-item ${isSelected ? 'selected' : ''}`}
+                        onClick={() => {
+                          const newSelected = new Set(selectedIngredients);
+                          if (isSelected) {
+                            newSelected.delete(index);
+                          } else {
+                            newSelected.add(index);
+                          }
+                          setSelectedIngredients(newSelected);
+                        }}
+                      >
+                        <span className={`ingredient-checkbox ${isSelected ? 'selected' : ''}`}></span>
+                        <span className="ingredient-name">{ingredientText}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p>No ingredient information available</p>
+                )}
               </div>
             </div>
 
@@ -384,7 +525,7 @@ const FoodDetail: React.FC = () => {
                   cleanInstruction = cleanInstruction.replace(/^\d+\)\s*/, '');
                   return (
                     <div key={index} className="instruction-item">
-                      <div className="step-number">{index + 1}</div>
+                      <div className="step-label">Step {index + 1}</div>
                       <div className="step-content">{cleanInstruction}</div>
                     </div>
                   );
@@ -394,11 +535,181 @@ const FoodDetail: React.FC = () => {
 
             {/* Nutrition Section */}
             <div className="nutrition-section">
-              <h3>Nutrition</h3>
+              <h2>Nutrition Facts <small className="per-serving-text">(per serving)</small></h2>
               {recipe?.nutrition_calories ? (
-                <div className="nutrition-info">
-                  <p>Calories: {recipe.nutrition_calories} per serving</p>
+                <>
+                  {/* Summary View - 4 basic nutrients */}
+                  {!showFullNutrition && (
+                    <div className="nutrition-summary">
+                      <div className="nutrition-summary-grid">
+                        <div className="nutrition-summary-item">
+                          <span className="nutrition-summary-value">{Math.round(recipe.nutrition_calories)}</span>
+                          <span className="nutrition-summary-label">Calories</span>
+                        </div>
+                        {recipe.nutrition_total_fat && (
+                          <div className="nutrition-summary-item">
+                            <span className="nutrition-summary-value">{recipe.nutrition_total_fat.toFixed(1)}g</span>
+                            <span className="nutrition-summary-label">Fat</span>
+                          </div>
+                        )}
+                        {recipe.nutrition_total_carbohydrate && (
+                          <div className="nutrition-summary-item">
+                            <span className="nutrition-summary-value">{recipe.nutrition_total_carbohydrate.toFixed(1)}g</span>
+                            <span className="nutrition-summary-label">Carbs</span>
+                          </div>
+                        )}
+                        {recipe.nutrition_protein && (
+                          <div className="nutrition-summary-item">
+                            <span className="nutrition-summary-value">{recipe.nutrition_protein.toFixed(1)}g</span>
+                            <span className="nutrition-summary-label">Protein</span>
+                          </div>
+                        )}
+                      </div>
+                      <button 
+                        className="nutrition-toggle-button"
+                        onClick={() => setShowFullNutrition(true)}
+                      >
+                        Show Full Nutrition Label
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Full Nutrition Label - USDA Style */}
+                  {showFullNutrition && (
+                <div className="nutrition-label-container">
+                  {/* Servings Info */}
+                  {recipe.servings && (
+                    <div className="nutrition-servings-info">
+                      Servings Per Recipe: <strong>{recipe.servings}</strong>
+                    </div>
+                  )}
+                  
+                  {/* Calories - Highlighted */}
+                  <div className="nutrition-row nutrition-calories-row">
+                    <span className="nutrition-label-text">Calories</span>
+                    <span className="nutrition-value-text">{Math.round(recipe.nutrition_calories)}</span>
+                  </div>
+                  
+                  <div className="nutrition-divider"></div>
+                  
+                  {/* Nutrients with % Daily Value */}
+                  <div className="nutrition-dv-header">
+                    <span style={{ textAlign: 'right', width: '100%', fontSize: '12px', fontWeight: 'bold' }}>% Daily Value *</span>
+                  </div>
+                  
+                  {/* Total Fat */}
+                  {recipe.nutrition_total_fat && (
+                    <>
+                      <div className="nutrition-row">
+                        <span className="nutrition-label-text"><strong>Total Fat</strong> {recipe.nutrition_total_fat.toFixed(1)}g</span>
+                        <span className="nutrition-dv-text"><strong>{Math.round((recipe.nutrition_total_fat / 78) * 100)}%</strong></span>
+                      </div>
+                      {/* Saturated Fat - Indented */}
+                      {recipe.nutrition_saturated_fat && (
+                        <div className="nutrition-row nutrition-row-indent">
+                          <span className="nutrition-label-text">Saturated Fat {recipe.nutrition_saturated_fat.toFixed(1)}g</span>
+                          <span className="nutrition-dv-text"><strong>{Math.round((recipe.nutrition_saturated_fat / 20) * 100)}%</strong></span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  {/* Cholesterol */}
+                  {recipe.nutrition_cholesterol && (
+                    <div className="nutrition-row">
+                      <span className="nutrition-label-text"><strong>Cholesterol</strong> {Math.round(recipe.nutrition_cholesterol)}mg</span>
+                      <span className="nutrition-dv-text"><strong>{Math.round((recipe.nutrition_cholesterol / 300) * 100)}%</strong></span>
+                    </div>
+                  )}
+                  
+                  {/* Sodium */}
+                  {recipe.nutrition_sodium && (
+                    <div className="nutrition-row">
+                      <span className="nutrition-label-text"><strong>Sodium</strong> {Math.round(recipe.nutrition_sodium)}mg</span>
+                      <span className="nutrition-dv-text"><strong>{Math.round((recipe.nutrition_sodium / 2300) * 100)}%</strong></span>
+                    </div>
+                  )}
+                  
+                  {/* Total Carbohydrate */}
+                  {recipe.nutrition_total_carbohydrate && (
+                    <>
+                      <div className="nutrition-row">
+                        <span className="nutrition-label-text"><strong>Total Carbohydrate</strong> {recipe.nutrition_total_carbohydrate.toFixed(1)}g</span>
+                        <span className="nutrition-dv-text"><strong>{Math.round((recipe.nutrition_total_carbohydrate / 275) * 100)}%</strong></span>
+                      </div>
+                      {/* Dietary Fiber - Indented */}
+                      {recipe.nutrition_dietary_fiber && (
+                        <div className="nutrition-row nutrition-row-indent">
+                          <span className="nutrition-label-text">Dietary Fiber {recipe.nutrition_dietary_fiber.toFixed(1)}g</span>
+                          <span className="nutrition-dv-text"><strong>{Math.round((recipe.nutrition_dietary_fiber / 28) * 100)}%</strong></span>
+                        </div>
+                      )}
+                      {/* Total Sugars - Indented */}
+                      {recipe.nutrition_total_sugars && (
+                        <div className="nutrition-row nutrition-row-indent">
+                          <span className="nutrition-label-text">Total Sugars {recipe.nutrition_total_sugars.toFixed(1)}g</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  {/* Protein */}
+                  {recipe.nutrition_protein && (
+                    <div className="nutrition-row">
+                      <span className="nutrition-label-text"><strong>Protein</strong> {recipe.nutrition_protein.toFixed(1)}g</span>
+                      <span className="nutrition-dv-text"><strong>{Math.round((recipe.nutrition_protein / 50) * 100)}%</strong></span>
+                    </div>
+                  )}
+                  
+                  <div className="nutrition-divider"></div>
+                  
+                  {/* Vitamins and Minerals */}
+                  {recipe.nutrition_vitamin_c !== undefined && recipe.nutrition_vitamin_c !== null && (
+                    <div className="nutrition-row">
+                      <span className="nutrition-label-text">Vitamin C {Math.round(recipe.nutrition_vitamin_c)}mg</span>
+                      <span className="nutrition-dv-text">{Math.round((recipe.nutrition_vitamin_c / 90) * 100)}%</span>
+                    </div>
+                  )}
+                  
+                  {recipe.nutrition_calcium !== undefined && recipe.nutrition_calcium !== null && (
+                    <div className="nutrition-row">
+                      <span className="nutrition-label-text">Calcium {Math.round(recipe.nutrition_calcium)}mg</span>
+                      <span className="nutrition-dv-text">{Math.round((recipe.nutrition_calcium / 1300) * 100)}%</span>
+                    </div>
+                  )}
+                  
+                  {recipe.nutrition_iron !== undefined && recipe.nutrition_iron !== null && (
+                    <div className="nutrition-row">
+                      <span className="nutrition-label-text">Iron {Math.round(recipe.nutrition_iron)}mg</span>
+                      <span className="nutrition-dv-text">{Math.round((recipe.nutrition_iron / 18) * 100)}%</span>
+                    </div>
+                  )}
+                  
+                  {recipe.nutrition_potassium !== undefined && recipe.nutrition_potassium !== null && (
+                    <div className="nutrition-row">
+                      <span className="nutrition-label-text">Potassium {Math.round(recipe.nutrition_potassium)}mg</span>
+                      <span className="nutrition-dv-text">{Math.round((recipe.nutrition_potassium / 4700) * 100)}%</span>
+                    </div>
+                  )}
+                  
+                  <div className="nutrition-divider"></div>
+                  
+                  {/* Footnotes */}
+                  <div className="nutrition-footnote">
+                    <p>* Percent Daily Values are based on a 2,000 calorie diet. Your daily values may be higher or lower depending on your calorie needs.</p>
+                    <p style={{ marginTop: '8px' }}>** Nutrient information is not available for all ingredients. Amount is based on available nutrient data.</p>
+                    <p style={{ marginTop: '8px' }}>(-) Information is not currently available for this nutrient. If you are following a medically restrictive diet, please consult your doctor or registered dietitian before preparing this recipe for personal consumption.</p>
+                  </div>
+                  
+                  <button 
+                    className="nutrition-toggle-button nutrition-toggle-hide"
+                    onClick={() => setShowFullNutrition(false)}
+                  >
+                    Hide Full Label
+                  </button>
                 </div>
+                  )}
+                </>
               ) : (
                 <p className="nutrition-unavailable">Nutrition information is not available for this recipe.</p>
               )}

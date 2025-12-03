@@ -116,6 +116,22 @@ except Exception as e:
 NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9]+")
 TOKEN_MAP_CACHE: Dict[str, Optional[str]] = {}
 
+# Performance optimization: Convert frequently checked sets to frozensets for faster lookups
+MEAT_FISH_SET = frozenset({
+    "beef","pork","chicken","duck","lamb","turkey","bacon","ham","sausage","prosciutto","pancetta",
+    "brisket","meatball","steak","salami","rib","tenderloin","cutlet","sirloin",
+    "fish","salmon","tuna","shrimp","crab","mussel","scallop","crawfish","fillet","bronzino","crabmeat","katsuobushi"
+})
+POWDER_ENDINGS_SET = frozenset({"powder","powdered","ground","crushed"})
+SEASONING_ENDINGS_SET = frozenset({"seasoning","spice","mix","rub","blend","masala","curry","salt","pepper"})
+COOKING_METHOD_WORDS_SET = frozenset({
+    "edge", "edges", "dipping", "char", "garnish", "serving",
+    "dry", "towel", "towels", "minced", "chopped", "diced", "grated",
+    "squeezed", "drained", "paper", "skewer", "skewers", "optional",
+    "sliced", "freshly", "spray", "cooking"
+})
+SPECIFIC_MEATS = frozenset(("salmon","tuna","shrimp","crab","mussel","scallop","fish","chicken","beef","pork","duck","lamb","turkey"))
+
 # Precompiled regex patterns for performance
 REGEX_ENCODING_FIX_1 = re.compile(r'á([a-z]+)á', re.IGNORECASE)
 REGEX_ENCODING_FIX_2 = re.compile(r'á([a-z]+)', re.IGNORECASE)
@@ -227,16 +243,17 @@ FIX_MAP_TOKEN = {
 
 }
 
-@lru_cache(maxsize=10000)
+@lru_cache(maxsize=20000)  # Increased cache size for better hit rate
 def normalize_text(value: str) -> str:
     """
     Normalize text using build_canonical for consistency with canonical_ingredients.json.
     This ensures the same normalization logic is used for matching.
     Cached for performance.
     """
-    if value is None:
+    if not value:  # More Pythonic check for empty/None
         return ""
     
+    # Apply encoding fixes
     value = REGEX_ENCODING_FIX_1.sub(r'a \1 a', value)
     value = REGEX_ENCODING_FIX_2.sub(r'a \1', value)
     value = REGEX_ENCODING_FIX_3.sub(r'\1 a', value)
@@ -246,17 +263,17 @@ def normalize_text(value: str) -> str:
     else:
         normalized = value.strip().lower()
         normalized = REGEX_LEAVE_TO_LEAF.sub('leaf', normalized)
-        if normalized in FIX_MAP:
-            normalized = FIX_MAP[normalized]
+        normalized = FIX_MAP.get(normalized, normalized)  # Faster than 'if in' check
         for pattern in REGEX_PACKING_PATTERNS:
             normalized = pattern.sub('', normalized)
         normalized = REGEX_WHITESPACE.sub(' ', normalized).strip()
     
+    # Combine pattern applications for efficiency
     normalized = REGEX_NON_ALNUM_SPACE.sub(" ", normalized)
     return REGEX_WHITESPACE.sub(" ", normalized).strip()
 
 
-@lru_cache(maxsize=5000)
+@lru_cache(maxsize=10000)  # Increased cache size for better performance
 def _simplify_token_no_lookup(token: str) -> str:
     """
     Cached version of _simplify_token when exact_lookup is None (most common case).
@@ -395,7 +412,9 @@ def _simplify_token_impl(token: str, exact_lookup: Optional[Dict[str, str]] = No
     head = head.replace("_", " ")
     return head.strip()
 
+@lru_cache(maxsize=5000)  # Add caching for frequently called function
 def strip_packing_phrases(s: str) -> str:
+    """Strip packing phrases from ingredient text. Cached for performance."""
     s = REGEX_COMMA_SPACE.sub(" ", s)
     for pat in PACKING_PATTERNS:
         s = re.sub(pat, "", s)
@@ -406,11 +425,12 @@ def strip_packing_phrases(s: str) -> str:
 
 
 def tokenize_ingredients(raw: str) -> List[str]:
-    """Tokenize & normalize ingredients with general rules."""
+    """Tokenize & normalize ingredients with general rules. Optimized version."""
     if not raw:
         return []
     raw = preprocess_compound_phrases(raw) 
     
+    # Apply all cooking method patterns in one pass
     for pattern in REGEX_COOKING_METHOD_PHRASES:
         raw = pattern.sub("", raw)
     
@@ -419,13 +439,10 @@ def tokenize_ingredients(raw: str) -> List[str]:
     parts = REGEX_INGREDIENT_SEPARATORS.split(raw)
     tokens: List[str] = []
 
-    MEAT_FISH = {
-        "beef","pork","chicken","duck","lamb","turkey","bacon","ham","sausage","prosciutto","pancetta",
-        "brisket","meatball","steak","salami","rib","tenderloin","cutlet","sirloin",
-        "fish","salmon","tuna","shrimp","crab","mussel","scallop","crawfish","fillet","bronzino","crabmeat","katsuobushi"
-    }
-    POWDER_ENDINGS = {"powder","powdered","ground","crushed"}
-    SEASONING_ENDINGS = {"seasoning","spice","mix","rub","blend","masala","curry","salt","pepper"}
+    # Use pre-compiled frozen sets for better performance
+    MEAT_FISH = MEAT_FISH_SET
+    POWDER_ENDINGS = POWDER_ENDINGS_SET
+    SEASONING_ENDINGS = SEASONING_ENDINGS_SET
 
     for p in parts:
         if _HAS_BUILD_CANONICAL:
@@ -547,9 +564,11 @@ def tokenize_ingredients(raw: str) -> List[str]:
 
         mapped = None
 
+        # Optimized meat/fish detection using pre-compiled set
         for k in MEAT_FISH:
             if f" {k} " in lower:
-                specific = [x for x in ("salmon","tuna","shrimp","crab","mussel","scallop","fish","chicken","beef","pork","duck","lamb","turkey") if f" {x} " in lower]
+                # Use pre-compiled frozenset for faster lookup
+                specific = [x for x in SPECIFIC_MEATS if f" {x} " in lower]
                 mapped = specific[0] if specific else k
                 break
 
@@ -693,13 +712,8 @@ def tokenize_ingredients(raw: str) -> List[str]:
         if not mapped or mapped in NON_ING_WORDS:
             continue
         
-        cooking_method_words = {
-            "edge", "edges", "dipping", "char", "garnish", "serving",
-            "dry", "towel", "towels", "minced", "chopped", "diced", "grated",
-            "squeezed", "drained", "paper", "skewer", "skewers", "optional",
-            "sliced", "freshly", "spray", "cooking"
-        }
-        if mapped.lower() in cooking_method_words:
+        # Use pre-compiled frozenset for faster lookup
+        if mapped.lower() in COOKING_METHOD_WORDS_SET:
             continue
         
         if "cooking spray" in lower or ("cooking" in lower and "spray" in lower):
@@ -744,18 +758,23 @@ def parse_cuisines(raw: Optional[str]) -> List[str]:
         return []
     # Split by common separators: comma, semicolon, slash, pipe
     parts = REGEX_CUISINE_SEPARATORS.split(str(raw))
+    # Use set for O(1) deduplication, then convert to list
+    seen = set()
     cuisines: List[str] = []
     for c in parts:
         c = c.strip()  # Remove whitespace
         if not c:  # Skip empty strings
             continue
         cname = normalize_cuisine_name(c)
-        if cname and cname not in cuisines:
+        if cname and cname not in seen:
+            seen.add(cname)
             cuisines.append(cname)
     return cuisines
 
 
+@lru_cache(maxsize=10000)  # Cache for performance - this is a hot function
 def levenshtein_distance(a: str, b: str) -> int:
+    """Compute Levenshtein distance between two strings. Cached for performance."""
     if a == b:
         return 0
     if not a:
@@ -774,7 +793,9 @@ def levenshtein_distance(a: str, b: str) -> int:
     return prev[-1]
 
 
+@lru_cache(maxsize=10000)  # Cache for performance
 def similarity_ratio(a: str, b: str) -> float:
+    """Compute similarity ratio (1 - normalized Levenshtein distance). Cached for performance."""
     if not a and not b:
         return 1.0
     dist = levenshtein_distance(a, b)
@@ -1099,23 +1120,23 @@ def precompute_matching_maps(labels: List[IngredientLabel]) -> Tuple[Dict[str, s
     
     base_to_variants = build_base_to_variants_map(labels)
     
-    canonical_inverted_index: Dict[str, List[str]] = {}
+    # Optimized: Use defaultdict and sets for faster inverted index building
+    from collections import defaultdict
+    canonical_inverted_index_sets: Dict[str, set] = defaultdict(set)
     for name in canonical_to_id.keys():
         words = name.lower().split()
         for word in words:
-            if word not in canonical_inverted_index:
-                canonical_inverted_index[word] = []
-            if name not in canonical_inverted_index[word]:
-                canonical_inverted_index[word].append(name)
+            canonical_inverted_index_sets[word].add(name)
+    # Convert sets to lists after deduplication
+    canonical_inverted_index = {word: list(names) for word, names in canonical_inverted_index_sets.items()}
     
-    synonyms_inverted_index: Dict[str, List[str]] = {}
+    synonyms_inverted_index_sets: Dict[str, set] = defaultdict(set)
     for name in all_synonyms_to_id.keys():
         words = name.lower().split()
         for word in words:
-            if word not in synonyms_inverted_index:
-                synonyms_inverted_index[word] = []
-            if name not in synonyms_inverted_index[word]:
-                synonyms_inverted_index[word].append(name)
+            synonyms_inverted_index_sets[word].add(name)
+    # Convert sets to lists after deduplication
+    synonyms_inverted_index = {word: list(names) for word, names in synonyms_inverted_index_sets.items()}
     
     return exception_to_id, canonical_to_id, all_synonyms_to_id, characteristic_canonicals, canonical_sorted, synonyms_sorted, base_to_variants, canonical_inverted_index, synonyms_inverted_index
 
@@ -1141,8 +1162,11 @@ def match_ingredient_from_raw_text(raw_text: str, labels: List[IngredientLabel],
     if not raw_text:
         return None
     
+    # Cache lower() call for reuse - performance optimization
+    raw_text_lower = raw_text.lower()
+    
     # Filter out "cooking spray" early - it's a cooking tool, not an ingredient
-    if "cooking spray" in raw_text.lower():
+    if "cooking spray" in raw_text_lower:
         return None
     
     text_for_normalize = raw_text.strip()
@@ -1256,18 +1280,11 @@ def match_ingredient_from_raw_text(raw_text: str, labels: List[IngredientLabel],
     
     exception_sorted = sorted(exception_to_id.keys(), key=len, reverse=True)
     
+    # Optimized: Use single flexible pattern instead of compiling 3 patterns per exception
     for exception_name in exception_sorted:
-        pattern = re.compile(r'\b' + re.escape(exception_name) + r'\b', re.IGNORECASE)
+        # Single flexible pattern that handles exact match and plural
+        pattern = re.compile(r'\b' + re.escape(exception_name) + r'(?:s)?\b', re.IGNORECASE)
         if pattern.search(normalized_raw_lower):
-            return exception_to_id[exception_name]
-        
-        exception_plural = exception_name + "s"
-        pattern_plural = re.compile(r'\b' + re.escape(exception_plural) + r'\b', re.IGNORECASE)
-        if pattern_plural.search(normalized_raw_lower):
-            return exception_to_id[exception_name]
-        
-        pattern_flexible = re.compile(r'\b' + re.escape(exception_name) + r'(?:s)?\b', re.IGNORECASE)
-        if pattern_flexible.search(normalized_raw_lower):
             return exception_to_id[exception_name]
     
     variant_matches = []
@@ -1290,22 +1307,13 @@ def match_ingredient_from_raw_text(raw_text: str, labels: List[IngredientLabel],
             if seen_ingredient_ids is not None and variant_id in seen_ingredient_ids:
                 continue
             
-            pattern = re.compile(r'\b' + re.escape(variant_normalized) + r'\b', re.IGNORECASE)
+            # Optimized: Use single flexible pattern instead of compiling 3 patterns per variant
+            pattern = re.compile(r'\b' + re.escape(variant_normalized) + r'(?:s)?\b', re.IGNORECASE)
             if pattern.search(normalized_raw_lower):
                 variant_matches.append((variant_id, variant_name, base_name, len(variant_normalized)))
                 continue
             
-            variant_plural = variant_normalized + "s"
-            pattern_plural = re.compile(r'\b' + re.escape(variant_plural) + r'\b', re.IGNORECASE)
-            if pattern_plural.search(normalized_raw_lower):
-                variant_matches.append((variant_id, variant_name, base_name, len(variant_normalized)))
-                continue
-            
-            pattern_flexible = re.compile(r'\b' + re.escape(variant_normalized) + r'(?:s)?\b', re.IGNORECASE)
-            if pattern_flexible.search(normalized_raw_lower):
-                variant_matches.append((variant_id, variant_name, base_name, len(variant_normalized)))
-                continue
-            
+            # Fallback for multi-word or long variants
             if len(variant_normalized.split()) > 1 or len(variant_normalized) > 5:
                 if variant_normalized in normalized_raw_lower:
                     variant_matches.append((variant_id, variant_name, base_name, len(variant_normalized)))
@@ -1317,16 +1325,17 @@ def match_ingredient_from_raw_text(raw_text: str, labels: List[IngredientLabel],
         return best_match[0]
     characteristic_words_set = get_characteristic_words()
     
+    # Optimized: Build single regex pattern for all preparation words to avoid loop
     if _HAS_BUILD_CANONICAL:
         preparation_words = list(CUT_OR_FORM_WORDS) + ["freshly", "extra", "virgin", "extra-virgin"]
     else:
         preparation_words = ["ground", "freshly", "dried", "fresh", "frozen", "sliced", "chopped", 
                             "diced", "minced", "grated", "crushed", "whole", "cracked", "extra", "virgin", "extra-virgin"]
     
-    text_for_canonical = normalized_raw_lower
-    for prep_word in preparation_words:
-        prep_pattern = re.compile(r'\b' + re.escape(prep_word.lower()) + r'\b', re.IGNORECASE)
-        text_for_canonical = prep_pattern.sub(' ', text_for_canonical)
+    # Compile single pattern for all prep words (much faster than loop)
+    prep_pattern_str = r'\b(' + '|'.join(re.escape(word.lower()) for word in preparation_words) + r')\b'
+    prep_pattern_combined = re.compile(prep_pattern_str, re.IGNORECASE)
+    text_for_canonical = prep_pattern_combined.sub(' ', normalized_raw_lower)
     text_for_canonical = REGEX_WHITESPACE.sub(' ', text_for_canonical).strip()
     
     text_words = text_for_canonical.lower().split()
@@ -1600,8 +1609,16 @@ def map_ingredient(token: str, exact: Dict[str, str], labels: List[IngredientLab
     best_id: Optional[str] = None
     best_score: float = 0.0
     
+    # Optimized: Compute tok_simplified once outside loop
+    if not tok_simplified:
+        tok_simplified = _simplify_token(token, exact_lookup=exact)
+    
     # First try against canonical names
     for lab in labels:
+        # Early termination: if we have a perfect match, no need to continue
+        if best_score >= 1.0:
+            break
+            
         score = similarity_ratio(tok, lab.canonical_name)
         if score > best_score:
             best_score = score
@@ -1658,16 +1675,19 @@ def semantic_fallback_batch(tokens: List[str],
                             label_embeds: "torch.Tensor",
                             label_list: List[IngredientLabel],
                             threshold: float = 0.78) -> Dict[str, Optional[str]]:
-    """Return map token → ingredient_id (or None) using embeddings."""
+    """Return map token → ingredient_id (or None) using embeddings. Optimized version."""
     if not tokens:
         return {}
+    # Normalize tokens in batch (list comprehension is faster than loop)
     qs = [normalize_text(t) for t in tokens]
-    q_embs = model.encode(qs, convert_to_tensor=True, normalize_embeddings=True, batch_size=128)
+    # Use larger batch size for better GPU utilization
+    q_embs = model.encode(qs, convert_to_tensor=True, normalize_embeddings=True, batch_size=256)
     if label_embeds.is_cuda:
         q_embs = q_embs.to(torch.device("cuda"))
     cos = util.cos_sim(q_embs, label_embeds)  # B x N
     best_idx = torch.argmax(cos, dim=1)       # B
     best_scores = torch.gather(cos, 1, best_idx.unsqueeze(1)).squeeze(1)  # B
+    # Optimized: Build dict in one pass
     out: Dict[str, Optional[str]] = {}
     for i, tok in enumerate(tokens):
         score = float(best_scores[i].item())
@@ -1764,6 +1784,7 @@ def build_recipe_props(row: Dict[str, str]) -> Dict:
         "title": row.get("title") or "",
         "description": row.get("description") or "",
         "instructions": row.get("instructions") or "",
+        "ingredient": row.get("ingredients") or "",
         "tags": tags,
 
         # Times
@@ -1787,14 +1808,27 @@ def build_recipe_props(row: Dict[str, str]) -> Dict:
         "popularity_views": 0,
         "popularity_likes": 0,
 
-        # Nutrition
+        # Nutrition - Complete nutrition profile
+        # Core 7 nutrients for NRKG paper: calories, total_fat, saturated_fat, sodium, protein, total_sugars, total_carbohydrate
         "nutrition_calories": to_float(row.get("calories")),
         "nutrition_protein": to_float(row.get("protein")),
-        "nutrition_fat": to_float(row.get("fat")),
-        "nutrition_carbohydrate": to_float(row.get("carbohydrate")),
-        "nutrition_fiber": to_float(row.get("fiber")),
-        "nutrition_sugar": to_float(row.get("sugar")),
+        "nutrition_total_fat": to_float(row.get("total_fat")) or to_float(row.get("fat")),  # Support both column names
+        "nutrition_saturated_fat": to_float(row.get("saturated_fat")) or (to_float(row.get("total_fat")) * 0.4 if to_float(row.get("total_fat")) else (to_float(row.get("fat")) * 0.4 if to_float(row.get("fat")) else None)),  # Estimate 40% of total_fat if missing (required for 7 core nutrients)
+        "nutrition_cholesterol": to_float(row.get("cholesterol")),
         "nutrition_sodium": to_float(row.get("sodium")),
+        "nutrition_total_carbohydrate": to_float(row.get("total_carbohydrate")) or to_float(row.get("carbohydrate")),  # Support both
+        "nutrition_dietary_fiber": to_float(row.get("dietary_fiber")) or to_float(row.get("fiber")),  # Support both
+        "nutrition_total_sugars": to_float(row.get("total_sugars")) or to_float(row.get("sugar")),  # Support both
+        # Additional micronutrients
+        "nutrition_vitamin_c": to_float(row.get("vitamin_c")),
+        "nutrition_calcium": to_float(row.get("calcium")),
+        "nutrition_iron": to_float(row.get("iron")),
+        "nutrition_potassium": to_float(row.get("potassium")),
+        # Legacy fields for backward compatibility (map to new names)
+        "nutrition_fat": to_float(row.get("total_fat")) or to_float(row.get("fat")),
+        "nutrition_carbohydrate": to_float(row.get("total_carbohydrate")) or to_float(row.get("carbohydrate")),
+        "nutrition_fiber": to_float(row.get("dietary_fiber")) or to_float(row.get("fiber")),
+        "nutrition_sugar": to_float(row.get("total_sugars")) or to_float(row.get("sugar")),
 
         # Media
         "image_urls": [row.get("image_url")] if row.get("image_url") else [],
@@ -1831,9 +1865,7 @@ def format_cypher_value(val: any) -> str:
 
 def generate_cypher_file(recipes: List[Dict], output_path: Path, verbose: bool = False, log_batch_size: int = 100) -> None:
     """
-    Generate Cypher import file using UNWIND pattern with parameterized queries.
-    This is much more efficient than individual MERGE statements.
-    Similar to build_cypher_batch but writes to file with :param rows => {...}
+    Generate Cypher import file with individual MERGE statements for compatibility with cypher-shell.
     
     Args:
         recipes: List of recipe dictionaries
@@ -1842,44 +1874,89 @@ def generate_cypher_file(recipes: List[Dict], output_path: Path, verbose: bool =
         log_batch_size: Log progress every N recipes (default: 100)
     """
     print(f"[*] Generating Cypher file: {output_path}")
-    print(f"   Using UNWIND pattern with parameterized queries for {len(recipes)} recipes")
-    print(f"   This is much more efficient than individual MERGE statements")
+    print(f"   Creating individual MERGE statements for {len(recipes)} recipes")
     
     start_time = time.time()
     
-    # Prepare data in the format expected by build_cypher_batch
-    rows_data = []
-    for idx, recipe in enumerate(recipes, 1):
-        if idx % log_batch_size == 0:
-            elapsed = time.time() - start_time
-            rate = idx / elapsed if elapsed > 0 else 0
-            remaining = len(recipes) - idx
-            eta = remaining / rate if rate > 0 else 0
-            print(f"[cypher] Progress: {idx}/{len(recipes)} recipes ({idx*100//len(recipes)}%) - {rate:.1f} recipes/sec - ETA: {eta:.0f}s")
-        
-        rows_data.append(recipe)
-        
-    # Build the parameter JSON
-    # json.dumps() automatically serializes None to null in JSON
-    param_json = json.dumps({"rows": rows_data}, ensure_ascii=False)
-    
-    # Get the Cypher query template from build_cypher_batch
-    cypher_query = build_cypher_batch([])
-        
-    # Combine parameter definition with query
-    cypher_content = f":param rows => {param_json};\n\n{cypher_query}"
-    
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    print(f"[cypher] Writing file to {output_path}...")
-    output_path.write_text(cypher_content, encoding="utf-8")
+    
+    with output_path.open("w", encoding="utf-8") as f:
+        for idx, recipe in enumerate(recipes, 1):
+            if idx % log_batch_size == 0:
+                elapsed = time.time() - start_time
+                rate = idx / elapsed if elapsed > 0 else 0
+                remaining = len(recipes) - idx
+                eta = remaining / rate if rate > 0 else 0
+                print(f"[cypher] Progress: {idx}/{len(recipes)} recipes ({idx*100//len(recipes)}%) - {rate:.1f} recipes/sec - ETA: {eta:.0f}s")
+            
+            recipe_id = recipe["recipe_id"]
+            props = recipe["props"]
+            ingredients = recipe.get("ingredients", [])
+            
+            # Escape function for Cypher strings
+            def escape_str(s):
+                if s is None:
+                    return "null"
+                if isinstance(s, str):
+                    s = s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
+                    return f'"{s}"'
+                if isinstance(s, bool):
+                    return "true" if s else "false"
+                if isinstance(s, (int, float)):
+                    return str(s) if s is not None else "null"
+                if isinstance(s, list):
+                    items = [escape_str(item) for item in s if item]
+                    return f'[{", ".join(items)}]'
+                return "null"
+            
+            # Write MERGE statement for recipe
+            f.write(f"MERGE (r:Recipe {{recipe_id: {escape_str(recipe_id)}}})\n")
+            f.write(f"SET r.title = {escape_str(props.get('title'))},\n")
+            f.write(f"    r.description = {escape_str(props.get('description'))},\n")
+            f.write(f"    r.instructions = {escape_str(props.get('instructions'))},\n")
+            f.write(f"    r.ingredient = {escape_str(props.get('ingredient'))},\n")
+            f.write(f"    r.tags = {escape_str(props.get('tags'))},\n")
+            f.write(f"    r.prep_time_min = {escape_str(props.get('prep_time_min'))},\n")
+            f.write(f"    r.cook_time_min = {escape_str(props.get('cook_time_min'))},\n")
+            f.write(f"    r.total_time_min = {escape_str(props.get('total_time_min'))},\n")
+            f.write(f"    r.servings = {escape_str(props.get('servings'))},\n")
+            f.write(f"    r.cuisine = {escape_str(props.get('cuisine'))},\n")
+            f.write(f"    r.rating_value = {escape_str(props.get('rating_value'))},\n")
+            f.write(f"    r.nutrition_calories = {escape_str(props.get('nutrition_calories'))},\n")
+            f.write(f"    r.nutrition_protein = {escape_str(props.get('nutrition_protein'))},\n")
+            f.write(f"    r.nutrition_total_fat = {escape_str(props.get('nutrition_total_fat'))},\n")
+            f.write(f"    r.nutrition_saturated_fat = {escape_str(props.get('nutrition_saturated_fat'))},\n")
+            f.write(f"    r.nutrition_cholesterol = {escape_str(props.get('nutrition_cholesterol'))},\n")
+            f.write(f"    r.nutrition_sodium = {escape_str(props.get('nutrition_sodium'))},\n")
+            f.write(f"    r.nutrition_total_carbohydrate = {escape_str(props.get('nutrition_total_carbohydrate'))},\n")
+            f.write(f"    r.nutrition_dietary_fiber = {escape_str(props.get('nutrition_dietary_fiber'))},\n")
+            f.write(f"    r.nutrition_total_sugars = {escape_str(props.get('nutrition_total_sugars'))},\n")
+            f.write(f"    r.nutrition_vitamin_c = {escape_str(props.get('nutrition_vitamin_c'))},\n")
+            f.write(f"    r.nutrition_calcium = {escape_str(props.get('nutrition_calcium'))},\n")
+            f.write(f"    r.nutrition_iron = {escape_str(props.get('nutrition_iron'))},\n")
+            f.write(f"    r.nutrition_potassium = {escape_str(props.get('nutrition_potassium'))},\n")
+            # Legacy fields for backward compatibility
+            f.write(f"    r.nutrition_fat = {escape_str(props.get('nutrition_fat'))},\n")
+            f.write(f"    r.nutrition_carbohydrate = {escape_str(props.get('nutrition_carbohydrate'))},\n")
+            f.write(f"    r.nutrition_fiber = {escape_str(props.get('nutrition_fiber'))},\n")
+            f.write(f"    r.nutrition_sugar = {escape_str(props.get('nutrition_sugar'))};\n")
+            
+            # Write relationship statements for ingredients
+            for ing in ingredients:
+                ing_id = ing.get("ingredient_id")
+                if ing_id:
+                    f.write(f"MATCH (r:Recipe {{recipe_id: {escape_str(recipe_id)}}})\n")
+                    f.write(f"MATCH (i:CanonicalIngredient {{ingredient_id: {escape_str(ing_id)}}})\n")
+                    f.write(f"MERGE (r)-[:HAS_INGREDIENT]->(i);\n")
+            
+            f.write("\n")
     
     total_time = time.time() - start_time
     file_size_mb = output_path.stat().st_size / 1024 / 1024
     print(f"[OK] Generated Cypher file with {len(recipes)} recipes")
     print(f"   File size: {file_size_mb:.1f} MB")
     print(f"   Time taken: {total_time:.1f}s ({len(recipes)/total_time:.1f} recipes/sec)")
-    print(f"   To import: Run this file in Neo4j Browser or use cypher-shell")
-    print(f"   Example: cypher-shell.bat -a bolt://localhost:7687 -u neo4j -p 'password' -d test --file {output_path}")
+    print(f"   To import: cypher-shell.bat -a bolt://localhost:7687 -u neo4j -p 'password' -d food --file {output_path}")
 
 
 # ==========================================
@@ -1893,6 +1970,7 @@ def build_cypher_batch(_: List[Dict]) -> str:
     lines.append("SET r.title = row.props.title,")
     lines.append("    r.description = row.props.description,")
     lines.append("    r.instructions = row.props.instructions,")
+    lines.append("    r.ingredient = row.props.ingredient,")
     lines.append("    r.tags = row.props.tags,")
     lines.append("    r.prep_time_min = row.props.prep_time_min,")
     lines.append("    r.cook_time_min = row.props.cook_time_min,")
@@ -1911,6 +1989,18 @@ def build_cypher_batch(_: List[Dict]) -> str:
     lines.append("    r.popularity_likes = coalesce(row.props.popularity_likes,0),")
     lines.append("    r.nutrition_calories = row.props.nutrition_calories,")
     lines.append("    r.nutrition_protein = row.props.nutrition_protein,")
+    lines.append("    r.nutrition_total_fat = row.props.nutrition_total_fat,")
+    lines.append("    r.nutrition_saturated_fat = row.props.nutrition_saturated_fat,")
+    lines.append("    r.nutrition_cholesterol = row.props.nutrition_cholesterol,")
+    lines.append("    r.nutrition_sodium = row.props.nutrition_sodium,")
+    lines.append("    r.nutrition_total_carbohydrate = row.props.nutrition_total_carbohydrate,")
+    lines.append("    r.nutrition_dietary_fiber = row.props.nutrition_dietary_fiber,")
+    lines.append("    r.nutrition_total_sugars = row.props.nutrition_total_sugars,")
+    lines.append("    r.nutrition_vitamin_c = row.props.nutrition_vitamin_c,")
+    lines.append("    r.nutrition_calcium = row.props.nutrition_calcium,")
+    lines.append("    r.nutrition_iron = row.props.nutrition_iron,")
+    lines.append("    r.nutrition_potassium = row.props.nutrition_potassium,")
+    # Legacy fields for backward compatibility
     lines.append("    r.nutrition_fat = row.props.nutrition_fat,")
     lines.append("    r.nutrition_carbohydrate = row.props.nutrition_carbohydrate,")
     lines.append("    r.nutrition_fiber = row.props.nutrition_fiber,")
@@ -2000,7 +2090,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Import recipes from CSV into Neo4j with ingredient mapping (fuzzy + semantic fallback)")
     parser.add_argument("--csv", type=str, default=str(Path("data/recipes/full_data_ing.csv")), help="Path to CSV with recipes")
-    parser.add_argument("--labels", type=str, default=str(Path("data/process/canonical_ingredients_migrated.json")), help="Path to ingredient labels (.json or .txt, default: canonical_ingredients_migrated.json)")
+    parser.add_argument("--labels", type=str, default=str(Path("data/ingredients/canonical_ingredients_migrated.json")), help="Path to ingredient labels (.json or .txt, default: canonical_ingredients_migrated.json)")
     parser.add_argument("--threshold", type=float, default=0.85, help="Fuzzy (Levenshtein) match threshold (0-1)")
     parser.add_argument("--semantic", action="store_true", help="Enable semantic fallback with SentenceTransformer")
     parser.add_argument("--semantic-threshold", type=float, default=0.78, help="Cosine threshold for semantic fallback (0-1)")

@@ -14,6 +14,7 @@ class InteractionRequest(BaseModel):
     recipe_id: str
     event_type: str = Field(..., pattern="^(view|like|rating)$")
     rating: Optional[int] = Field(None, ge=1, le=5)
+    session_id: Optional[str] = None  # ✨ Link to recommendation session
 
 
 # ========================
@@ -38,8 +39,9 @@ async def record_interaction(
             MATCH (r:Recipe {recipe_id:$rid})
             MERGE (u)-[rel:INTERACTED_WITH]->(r)
             ON CREATE SET rel.created_at = datetime()
-            SET rel.updated_at = datetime()
-        """, uid=user_id, rid=body.recipe_id)
+            SET rel.updated_at = datetime(),
+                rel.from_session = $session_id
+        """, uid=user_id, rid=body.recipe_id, session_id=body.session_id)
 
         # ===================
         # 👁️ View Event
@@ -146,20 +148,62 @@ async def record_interaction(
             if body.rating is None:
                 raise HTTPException(status_code=400, detail="Rating required for 'rating' event")
 
+            # Check if recipe has original rating from CSV (stored once)
+            check_q = """
+            MATCH (r:Recipe {recipe_id:$rid})
+            OPTIONAL MATCH (r)<-[user_rels:INTERACTED_WITH]-(:User)
+            WHERE user_rels.rating IS NOT NULL
+            WITH r, count(user_rels) AS existing_user_ratings
+            RETURN r.rating_value AS current_rating_value,
+                   r.rating_count AS current_rating_count,
+                   existing_user_ratings
+            """
+            check_result = s.run(check_q, rid=body.recipe_id).single()
+            
+            # Determine if we need to preserve original CSV rating
+            has_user_ratings = check_result["existing_user_ratings"] > 0
+            original_avg = check_result["current_rating_value"]
+            original_count = check_result["current_rating_count"]
+            
+            # If this is the FIRST user rating, store original CSV rating
+            if not has_user_ratings and original_avg and original_count:
+                # Store original rating in separate properties (preserve CSV data)
+                store_original = """
+                MATCH (r:Recipe {recipe_id:$rid})
+                SET r.csv_rating_value = $orig_avg,
+                    r.csv_rating_count = $orig_count
+                """
+                s.run(store_original, rid=body.recipe_id, orig_avg=original_avg, orig_count=original_count)
+            
             q = """
-            MATCH (u:User {user_id:$uid})-[rel:INTERACTED_WITH]->(r:Recipe {recipe_id:$rid})
+            MATCH (u:User {user_id:$uid})
+            MATCH (r:Recipe {recipe_id:$rid})
+            MERGE (u)-[rel:INTERACTED_WITH]->(r)
+            ON CREATE SET rel.created_at = datetime()
             SET rel.event_type = 'rating',
                 rel.rating = $rating,
                 rel.rating_time = datetime(),
-                rel.timestamp = datetime()
+                rel.timestamp = datetime(),
+                rel.updated_at = datetime()
             
-            // Re-calculate average rating for the recipe
+            // Calculate combined rating (CSV + user ratings)
             WITH r, rel
-            MATCH (r)<-[all_rels:INTERACTED_WITH]-(:User)
+            OPTIONAL MATCH (r)<-[all_rels:INTERACTED_WITH]-(:User)
             WHERE all_rels.rating IS NOT NULL
-            WITH r, rel, avg(all_rels.rating) AS new_avg, count(all_rels) AS new_count
-            SET r.rating_value = round(new_avg, 2),
-                r.rating_count = new_count
+            WITH r, rel,
+                 count(all_rels) AS user_count,
+                 coalesce(avg(all_rels.rating), 0.0) AS user_avg,
+                 coalesce(r.csv_rating_value, 0.0) AS csv_avg,
+                 coalesce(r.csv_rating_count, 0) AS csv_count
+            WITH r, rel,
+                 CASE 
+                   WHEN csv_count > 0 THEN
+                     (csv_avg * csv_count + user_avg * user_count) / (csv_count + user_count)
+                   ELSE user_avg
+                 END AS combined_avg,
+                 csv_count + user_count AS combined_count
+            SET r.rating_value = round(combined_avg, 2),
+                r.rating_count = combined_count
             
             RETURN rel.rating AS rating, r.rating_value AS avg_rating, r.rating_count AS count
             """
@@ -177,13 +221,78 @@ async def record_interaction(
 
 
 # ========================
+# 🗑️ DELETE — Remove user rating
+# ========================
+@router.delete("/{user_id}/interactions/{recipe_id}/rating", summary="Remove user rating for a recipe")
+async def remove_rating(
+    user_id: str,
+    recipe_id: str,
+    background_tasks: BackgroundTasks
+):
+    with get_session() as s:
+        # Check if relationship exists first
+        check_q = """
+        MATCH (u:User {user_id:$uid})-[rel:INTERACTED_WITH]->(r:Recipe {recipe_id:$rid})
+        WHERE rel.rating IS NOT NULL
+        RETURN count(rel) AS count
+        """
+        check_result = s.run(check_q, uid=user_id, rid=recipe_id).single()
+        
+        if not check_result or check_result["count"] == 0:
+            raise HTTPException(status_code=404, detail="No rating found for this recipe")
+        
+        # Remove rating and recalculate recipe average
+        q = """
+        MATCH (u:User {user_id:$uid})-[rel:INTERACTED_WITH]->(r:Recipe {recipe_id:$rid})
+        SET rel.rating = null,
+            rel.rating_time = null
+        
+        // Re-calculate average rating combining CSV data and remaining user ratings
+        WITH r
+        OPTIONAL MATCH (r)<-[all_rels:INTERACTED_WITH]-(:User)
+        WHERE all_rels.rating IS NOT NULL
+        WITH r,
+             count(all_rels) AS user_count,
+             coalesce(avg(all_rels.rating), 0.0) AS user_avg,
+             coalesce(r.csv_rating_value, 0.0) AS csv_avg,
+             coalesce(r.csv_rating_count, 0) AS csv_count
+        WITH r,
+             CASE 
+               WHEN csv_count > 0 AND user_count > 0 THEN
+                 (csv_avg * csv_count + user_avg * user_count) / (csv_count + user_count)
+               WHEN csv_count > 0 THEN csv_avg
+               WHEN user_count > 0 THEN user_avg
+               ELSE null
+             END AS combined_avg,
+             CASE
+               WHEN csv_count > 0 OR user_count > 0 THEN csv_count + user_count
+               ELSE 0
+             END AS combined_count
+        SET r.rating_value = CASE WHEN combined_avg IS NOT NULL THEN round(combined_avg, 2) ELSE null END,
+            r.rating_count = combined_count
+        
+        RETURN r.rating_value AS avg_rating, r.rating_count AS count
+        """
+        result = s.run(q, uid=user_id, rid=recipe_id).single()
+        
+        # ✅ Trigger incremental profile update
+        background_tasks.add_task(update_user_profile_incremental, user_id)
+        
+        return {
+            "message": "Rating removed 🗑️",
+            "recipe_avg_rating": result["avg_rating"],
+            "rating_count": result["count"]
+        }
+
+
+# ========================
 # 🧩 GET — Retrieve all user interactions
 # ========================
 @router.get("/{user_id}/interactions", summary="Get all user interactions (likes, ratings, views)")
 async def get_user_interactions(
     user_id: str,
     event_type: Optional[str] = Query(None, pattern="^(view|like|rating)$"),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=1000),  # Increased max limit to 1000 for stats/analytics
     offset: int = Query(0, ge=0)
 ):
     # Build query with optional filter
@@ -301,6 +410,46 @@ async def get_user_interactions(
 # ========================
 # 📊 GET — Get user interaction statistics
 # ========================
+@router.get("/{user_id}/interactions/count", summary="Get total interaction count")
+async def get_user_interaction_count(user_id: str):
+    """
+    Get total number of interactions for upgrade checking.
+    Returns count and whether user needs SIMILAR_USER upgrade.
+    """
+    with get_session() as s:
+        q = """
+        MATCH (u:User {user_id:$uid})-[:INTERACTED_WITH]->(r:Recipe)
+        WITH u, count(DISTINCT r) as interaction_count
+        
+        // Check if user has interaction-based SIMILAR_USER
+        OPTIONAL MATCH (u)-[sim:SIMILAR_USER]->(:User)
+        WITH interaction_count, 
+             any(s IN collect(sim) WHERE s.method = 'interaction_based') as has_interaction_based
+        
+        RETURN 
+            interaction_count,
+            has_interaction_based,
+            interaction_count >= 10 AND NOT has_interaction_based as needs_upgrade
+        """
+        
+        result = s.run(q, uid=user_id).single()
+        
+        if not result:
+            return {
+                "user_id": user_id,
+                "count": 0,
+                "needs_upgrade": False,
+                "has_interaction_based": False
+            }
+        
+        return {
+            "user_id": user_id,
+            "count": result.get("interaction_count", 0),
+            "needs_upgrade": result.get("needs_upgrade", False),
+            "has_interaction_based": result.get("has_interaction_based", False)
+        }
+
+
 @router.get("/{user_id}/interactions/stats", summary="Get user interaction statistics")
 async def get_user_interaction_stats(user_id: str):
     """Get aggregated statistics for user interactions"""

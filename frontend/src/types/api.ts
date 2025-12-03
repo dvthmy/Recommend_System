@@ -19,6 +19,14 @@ export interface UserProfile {
   max_cook_time?: number;
   meal_preferences?: string[];
   completed_onboarding?: boolean;  // Track if user completed onboarding
+  avatar_url?: string;  // User profile avatar image URL
+  // Dietary plan fields
+  dietary_plan?: string;  // "low_carb", "high_protein", "low_fat", "keto", "weight_gain", "weight_loss", or null
+  auto_dietary_plan?: boolean;  // If True, automatically calculate from BMI
+  bmi?: number;
+  weight_kg?: number;
+  height_cm?: number;
+  activity_level?: string;  // "sedentary", "light", "moderate", "active", "very_active"
   created_at?: string;
   updated_at?: string;
   access_token?: string;
@@ -35,6 +43,13 @@ export interface UserProfileUpdate {
   max_cook_time?: number;
   meal_preferences?: string[];
   completed_onboarding?: boolean;  // Track if user completed onboarding
+  avatar_url?: string;  // User profile avatar image URL
+  // Dietary plan fields
+  dietary_plan?: string;  // "low_carb", "high_protein", "low_fat", "keto", "weight_gain", "weight_loss", or null
+  auto_dietary_plan?: boolean;  // If True, automatically calculate from BMI
+  weight_kg?: number;
+  height_cm?: number;
+  activity_level?: string;  // "sedentary", "light", "moderate", "active", "very_active"
 }
 
 // Allergy and Dislike Types
@@ -71,11 +86,13 @@ export interface RecipeIngredient {
 export interface RecipeDetail {
   recipe_id: string;
   title: string;
+  url?: string;
   cuisine?: string;
   cook_time_min?: number;
   prep_time_min?: number;
   total_time_min?: number;
   servings?: number;
+  yield?: string;
   rating_value?: number;
   rating_count?: number;
   review_count?: number;
@@ -88,10 +105,26 @@ export interface RecipeDetail {
   popularity_cooks?: number;
   popularity_likes?: number;
   allergens?: string[];
+  // Nutrition fields (per serving)
   nutrition_calories?: number;
+  nutrition_protein?: number;
+  nutrition_total_fat?: number;
+  nutrition_saturated_fat?: number;
+  nutrition_total_carbohydrate?: number;
+  nutrition_dietary_fiber?: number;
+  nutrition_total_sugars?: number;
+  nutrition_sodium?: number;
+  nutrition_cholesterol?: number;
+  nutrition_vitamin_c?: number;
+  nutrition_calcium?: number;
+  nutrition_iron?: number;
+  nutrition_potassium?: number;
   equipment_needed?: string[];
   alternative_ingredients?: string[];
+  // Ingredients from relationships (structured)
   ingredients?: RecipeIngredient[];
+  // Ingredients from CSV (raw strings with quantity/unit)
+  ingredients_list?: string[];
   created_at?: string;
   updated_at?: string;
 }
@@ -112,11 +145,15 @@ export interface RecipeSummary {
 export interface RecipeRecommendation {
   recipe_id: string;
   title: string;
-  cuisine: string;
+  cuisine: string | string[];  // Backend returns array, but we'll convert to string for display
+  recipe_category?: string;  // Raw category from database (for backward compatibility)
+  meal?: string;  // Normalized meal type: "Breakfast", "Lunch", "Dinner", or "Snack"
   cook_time_min?: number;
-  score: number;
-  scores: Record<string, number>;
-  image: string[];
+  score?: number;
+  scores?: Record<string, number>;
+  match_percent?: number;  // Alternative to score
+  image?: string | string[];
+  image_urls?: string[];
 }
 
 export interface RecommendationRequest {
@@ -251,6 +288,12 @@ export interface UserCuisinesResponse {
   total: number;
 }
 
+export interface UserDietsResponse {
+  user_id: string;
+  diets: Diet[];
+  total: number;
+}
+
 export interface AllergyUpdateRequest {
   ingredient_ids: string[];
 }
@@ -263,6 +306,19 @@ export interface DislikeUpdateRequest {
 export interface CuisinePreferenceRequest {
   cuisine_name: string;
   preference_level: number;
+}
+
+export interface Diet {
+  diet_name: string;
+  description?: string;
+}
+
+export interface DietRequest {
+  diet_name: string;
+}
+
+export interface DietsUpdate {
+  diets: string[];
 }
 
 // Recipe Search Types

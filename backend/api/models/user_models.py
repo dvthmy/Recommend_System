@@ -14,6 +14,14 @@ class UserProfile(BaseModel):
     max_cook_time: Optional[int] = Field(None, ge=1, le=480)
     meal_preferences: Optional[List[str]] = None
     completed_onboarding: Optional[bool] = False  # Track if user completed onboarding
+    avatar_url: Optional[str] = None  # User profile avatar image URL
+    # Dietary plan fields
+    dietary_plan: Optional[str] = None  # "low_carb", "high_protein", "low_fat", "keto", "weight_gain", "weight_loss", or None
+    auto_dietary_plan: Optional[bool] = False  # If True, automatically calculate from BMI
+    bmi: Optional[float] = None
+    weight_kg: Optional[float] = Field(None, ge=1, le=500)
+    height_cm: Optional[float] = Field(None, ge=50, le=300)
+    activity_level: Optional[str] = None  # "sedentary", "light", "moderate", "active", "very_active"
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     access_token: Optional[str] = None
@@ -29,6 +37,13 @@ class UserProfileUpdate(BaseModel):
     max_cook_time: Optional[int] = Field(None, ge=1, le=480)
     meal_preferences: Optional[List[str]] = None
     completed_onboarding: Optional[bool] = None  # Track if user completed onboarding
+    avatar_url: Optional[str] = None  # User profile avatar image URL
+    # Dietary plan fields
+    dietary_plan: Optional[str] = None  # "low_carb", "high_protein", "low_fat", "keto", "weight_gain", "weight_loss", or None
+    auto_dietary_plan: Optional[bool] = None  # If True, automatically calculate from BMI
+    weight_kg: Optional[float] = Field(None, ge=1, le=500)
+    height_cm: Optional[float] = Field(None, ge=50, le=300)
+    activity_level: Optional[str] = None  # "sedentary", "light", "moderate", "active", "very_active"
 
 class SignUpRequest(BaseModel):
     username: str
@@ -55,4 +70,15 @@ class AllergyUpdateRequest(BaseModel):
 
 class CuisinePreferenceRequest(BaseModel):
     cuisine_name: str
-    preference_level: int = Field(default=5, ge=1, le=10)
+
+class CuisinePreferencesUpdate(BaseModel):
+    """Batch update cuisine preferences (for onboarding or profile edit)"""
+    cuisines: List[str] = Field(default=[], description="List of cuisine names. Empty list = No Preferences")
+
+class DietRequest(BaseModel):
+    """Single diet to add"""
+    diet_name: str
+
+class DietsUpdate(BaseModel):
+    """Batch update diets (for onboarding or profile edit)"""
+    diets: List[str] = Field(default=[], description="List of diet names. Empty list = No Diet Restrictions")

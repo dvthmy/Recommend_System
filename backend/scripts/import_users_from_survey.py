@@ -142,6 +142,7 @@ DISH_RULES = {
     "Pho": {"cuisine": "Vietnamese", "must_have": ["pho"], "must_not": []},
     "Banh Mi": {"cuisine": "Vietnamese", "must_have": ["banh", "mi"], "must_not": []},
     "Spring Rolls": {"cuisine": "Vietnamese", "must_have": ["spring", "roll"], "must_not": []},
+    "Bun Cha": {"cuisine": "Vietnamese", "must_have": ["bun", "cha"], "must_not": []},
     "Pad Thai": {"cuisine": "Thai", "must_have": ["pad", "thai"], "must_not": []},
     "Tom Yum": {"cuisine": "Thai", "must_have": ["tom", "yum"], "must_not": []},
     "Green Curry": {"cuisine": "Thai", "must_have": ["green", "curry"], "must_not": []},
@@ -165,6 +166,7 @@ DISH_RULES = {
     "Baguette": {"cuisine": "French", "must_have": ["baguette"], "must_not": []},
     "Creme Brulee": {"cuisine": "French", "must_have": ["creme", "brulee"], "must_not": []},
     "Ratatouille": {"cuisine": "French", "must_have": ["ratatouille"], "must_not": []},
+    "Korean Fried Chicken": {"cuisine": "Korean", "must_have": ["fried", "chicken"], "must_not": []},
 }
 
 
@@ -180,7 +182,6 @@ DISH_RULES_EXTRA = {
     "Banh Xeo": {"cuisine": "Vietnamese", "must_have": ["banh", "xeo"], "must_not": []},
     "Banh Khot": {"cuisine": "Vietnamese", "must_have": ["banh", "khot"], "must_not": []},
     "Banh Duc Nong": {"cuisine": "Vietnamese", "must_have": ["banh", "duc"], "must_not": []},
-    "Bun Cha": {"cuisine": "Vietnamese", "must_have": ["bun", "cha"], "must_not": []},
     "Banh Trang Tron": {"cuisine": "Vietnamese", "must_have": ["banh", "trang"], "must_not": []},
     "Com Tam": {"cuisine": "Vietnamese", "must_have": [], "must_not": []},
     "Com Suon": {"cuisine": "Vietnamese", "must_have": [], "must_not": []},
@@ -399,20 +400,35 @@ def _norm_gender(value: Optional[str]) -> Optional[str]:
         return "female"
     return "other"
 def _norm_age(value: Optional[str]) -> Optional[str]:
+    """
+    Chuẩn hoá độ tuổi từ text survey (vi + en) về các bucket:
+      <18, 18-30, 30-34, 45-54, 55+
+    """
     if not value:
         return None
     v = value.lower().replace("–", "-").strip()
 
+    # Dưới 18
     if "under" in v or "<18" in v or "dưới" in v:
         return "<18"
-    if "18" in v and ("30" in v or "24" in v):
+
+    # Nhóm 18-30 (bao phủ cả 18-24, 18-30, 25-34)
+    if ("18" in v and ("24" in v or "30" in v)) or ("25" in v and "34" in v):
         return "18-30"
+
+    # Nhóm 30-34 (chuỗi dạng "30 - 34")
     if "30" in v and "34" in v:
         return "30-34"
+
+    # 45-54
     if "45" in v and "54" in v:
         return "45-54"
+
+    # 55+
     if "55" in v or "trở lên" in v or "+" in v:
         return "55+"
+
+    # Nếu không match rule nào, trả về nguyên chuỗi gốc (ít gặp)
     return v
 
 # ============================================================
@@ -434,15 +450,25 @@ def _top_k_recipes_for_keyword(session, kw: str, k: int = 3, method: str = "hybr
     # Lấy giá trị trung bình toàn cục nếu chưa có
     if C is None or m is None:
         rec = session.run("""
-            MATCH (r:Recipe) WHERE r.rating_avg IS NOT NULL
-            RETURN avg(r.rating_avg) AS C, percentileCont(coalesce(r.review_count,0),0.5) AS p50
+            MATCH (r:Recipe) WHERE r.rating_value IS NOT NULL
+            RETURN avg(r.rating_value) AS C, percentileCont(coalesce(r.rating_count,0),0.5) AS p50
         """).single()
+        if not rec or rec["C"] is None or rec["p50"] is None:
+            return []
         C = rec["C"]
         m = rec["p50"]
 
+    # Fallback an toàn cho m (median rating_count)
+    try:
+        m_val = float(m)
+        if m_val <= 0:
+            m_val = 1.0
+    except Exception:
+        m_val = 1.0
+
     # ===== Tạo điều kiện động =====
-    where_parts = ["r.rating_avg IS NOT NULL"]
-    params = {"kw": kw, "C": C, "m": float(m)}
+    where_parts = ["r.rating_value IS NOT NULL"]
+    params = {"kw": kw, "C": C, "m": m_val}
 
     # 🔍 Tìm trong tiêu đề
     where_parts.append("toLower(r.title) CONTAINS toLower($kw)")
@@ -470,7 +496,7 @@ def _top_k_recipes_for_keyword(session, kw: str, k: int = 3, method: str = "hybr
         WITH $C AS C, toFloat($m) AS m
         MATCH (r:Recipe)
         WHERE {where_clause}
-        WITH r, coalesce(r.rating_avg,0.0) AS R, toFloat(coalesce(r.review_count,0)) AS v, C, m
+        WITH r, coalesce(r.rating_value,0.0) AS R, toFloat(coalesce(r.rating_count,0)) AS v, C, m
         WITH r, R, v, ((v/(v+m))*R + (m/(v+m))*C) AS score
         RETURN r.recipe_id AS id, r.title AS title, R AS rating, toInteger(v) AS reviews, score
         ORDER BY score DESC, reviews DESC
@@ -481,7 +507,7 @@ def _top_k_recipes_for_keyword(session, kw: str, k: int = 3, method: str = "hybr
         q = f"""
         MATCH (r:Recipe)
         WHERE {where_clause}
-        WITH r, coalesce(r.rating_avg,0.0) AS R, toFloat(coalesce(r.review_count,0)) AS v
+        WITH r, coalesce(r.rating_value,0.0) AS R, toFloat(coalesce(r.rating_count,0)) AS v
         WITH r, R, v,
              ((R/5.0) + (1.96^2)/(2*v) - 1.96*sqrt(((R/5.0)*(1 - R/5.0) + (1.96^2)/(4*v))/v)) /
              (1 + (1.96^2)/v) * 5 AS score
@@ -496,8 +522,8 @@ def _top_k_recipes_for_keyword(session, kw: str, k: int = 3, method: str = "hybr
         MATCH (r:Recipe)
         WHERE {where_clause}
         WITH r,
-            coalesce(r.rating_avg,0.0) AS R,
-            toFloat(coalesce(r.review_count,0)) AS v, C, m
+            coalesce(r.rating_value,0.0) AS R,
+            toFloat(coalesce(r.rating_count,0)) AS v, C, m
         WITH r, R, v, C, m,
             ((v/(v+m))*R + (m/(v+m))*C) AS bayes,
             CASE 
@@ -528,7 +554,8 @@ def _top_k_recipes_for_keyword(session, kw: str, k: int = 3, method: str = "hybr
 # ============================================================
 
 def pick_recipes(session, user_id: str, dish_name: str, C: float, m: int,
-                 mode: str = "main", seen_global: set[str] | None = None):
+                 mode: str = "main", seen_global: set[str] | None = None,
+                 allowed_cuisines: list[str] | None = None):
     """
     mode = 'main'  -> dùng DISH_RULES + DISH_MAP, mỗi món k=3
     mode = 'extra' -> dùng DISH_RULES_EXTRA + DISH_MAP_EXTRA, mỗi món k=1
@@ -555,6 +582,10 @@ def pick_recipes(session, user_id: str, dish_name: str, C: float, m: int,
     if mode == "main":
         for key, rule in DISH_RULES.items():
             if key in seen_keys or key in seen_global:
+                continue
+
+            # Nếu user có danh sách cuisine ưa thích, chỉ pick các món thuộc các cuisine đó
+            if allowed_cuisines and rule.get("cuisine") not in allowed_cuisines:
                 continue
 
             for alias in DISH_MAP.get(key, []):
@@ -589,7 +620,7 @@ def pick_recipes(session, user_id: str, dish_name: str, C: float, m: int,
         return all_results
 
     # ============================================================
-    #  EXTRA MODE
+    #  EXTRA MODE (không bắt buộc phải khớp cuisine ưa thích)
     # ============================================================
     else:
         # 🧹 Kiểm tra tránh pick lại các món đã được main chọn
@@ -677,6 +708,15 @@ def import_survey(csv_path: str, uri: str, user: str, password: str, database: O
                     email = (_row_get(row, cols["email"]) or f"user{idx}@example.com").lower()
                     user_id = f"survey_{idx}"
 
+                    # Xoá node User cũ (nếu có) cùng toàn bộ relationship để import lại từ survey
+                    session.run(
+                        """
+                        MATCH (u:User {user_id:$uid})
+                        DETACH DELETE u
+                        """,
+                        uid=user_id,
+                    )
+
                     skill = _norm_skill(_row_get(row, cols["skill"]))
                     max_time = _norm_time(_row_get(row, cols["time"]))
                     fav_cuisines = _extract_cuisines(_row_get(row, cols["cuisine"]))
@@ -706,6 +746,20 @@ def import_survey(csv_path: str, uri: str, user: str, password: str, database: O
                         """,
                         uid=user_id, name=name, email=email, skill=skill, max_time=max_time, diet=dietary_prefs,
                         gender=gender, age_group=age_group
+                    )
+
+                    # Tạo Group + BELONGS_TO dựa trên gender/age_group của user
+                    session.run(
+                        """
+                        MATCH (u:User {user_id:$uid})
+                        WHERE u.gender IS NOT NULL OR u.age_group IS NOT NULL
+                        MERGE (g:Group {
+                            gender: coalesce(u.gender, 'unknown'),
+                            age_group: coalesce(u.age_group, 'unknown')
+                        })
+                        MERGE (u)-[:BELONGS_TO]->(g)
+                        """,
+                        uid=user_id,
                     )
 
                     created_users += 1
@@ -771,14 +825,27 @@ def import_survey(csv_path: str, uri: str, user: str, password: str, database: O
                     fav_dishes_main = list(dict.fromkeys(fav_dishes_main))
 
                     rec_stat = session.run("""
-                        MATCH (r:Recipe) WHERE r.rating_avg IS NOT NULL
-                        RETURN avg(r.rating_avg) AS C, percentileCont(coalesce(r.review_count,0),0.5) AS p50
+                        MATCH (r:Recipe) WHERE r.rating_value IS NOT NULL
+                        RETURN avg(r.rating_value) AS C, percentileCont(coalesce(r.rating_count,0),0.5) AS p50
                     """).single()
-                    C_global = rec_stat["C"]
-                    m_global = rec_stat["p50"]
+                    if rec_stat and rec_stat["C"] is not None and rec_stat["p50"] is not None:
+                        C_global = rec_stat["C"]
+                        m_global = rec_stat["p50"]
+                    else:
+                        C_global = 0.0
+                        m_global = 1.0
 
                     for dish in fav_dishes_main:
-                        results = pick_recipes(session, user_id, dish, C_global, m_global, mode="main", seen_global=seen_global)
+                        results = pick_recipes(
+                            session,
+                            user_id,
+                            dish,
+                            C_global,
+                            m_global,
+                            mode="main",
+                            seen_global=seen_global,
+                            allowed_cuisines=fav_cuisines,
+                        )
                         for key, recipes in results:
                             if recipes:
                                 pretty = "; ".join([f"{r['title']} (★ {r['rating']:.2f}, {r['reviews']} reviews)" for r in recipes])
@@ -790,7 +857,15 @@ def import_survey(csv_path: str, uri: str, user: str, password: str, database: O
                         extra_cell = _row_get(row, cols["dish_col_extra"])
                         if extra_cell:
                             for raw_dish in _split_multi(extra_cell):
-                                results = pick_recipes(session, user_id, raw_dish, C_global, m_global, mode="extra")
+                                results = pick_recipes(
+                                    session,
+                                    user_id,
+                                    raw_dish,
+                                    C_global,
+                                    m_global,
+                                    mode="extra",
+                                    allowed_cuisines=fav_cuisines,
+                                )
                                 for key, recipes in results:
                                     if recipes:
                                         pretty = "; ".join([f"{r['title']} (★ {r['rating']:.2f}, {r['reviews']} reviews)" for r in recipes])

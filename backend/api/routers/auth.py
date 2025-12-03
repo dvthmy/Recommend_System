@@ -94,13 +94,22 @@ async def signup(request: SignUpRequest):
         if not rec:
             raise HTTPException(status_code=500, detail="Failed to create user")
         
-        # Create BELONGS_TO relationship if gender and age_group are available
-        if request.gender and age_group:
+        # Create BELONGS_TO relationship if gender OR age_group is available
+        # Use 'unknown' as placeholder for missing values
+        if request.gender or age_group:
+            gender_value = request.gender if request.gender else 'unknown'
+            age_group_value = age_group if age_group else 'unknown'
+            # Delete any existing BELONGS_TO first (in case user was updated)
+            s.run("""
+                MATCH (u:User {user_id: $uid})-[r:BELONGS_TO]->(g:Group)
+                DELETE r
+            """, uid=uid)
+            # Create new BELONGS_TO relationship
             s.run("""
                 MATCH (u:User {user_id: $uid})
                 MERGE (g:Group {gender: $gender, age_group: $age_group})
                 MERGE (u)-[:BELONGS_TO]->(g)
-            """, uid=uid, gender=request.gender, age_group=age_group)
+            """, uid=uid, gender=gender_value, age_group=age_group_value)
         
         user_data = dict(rec)
         

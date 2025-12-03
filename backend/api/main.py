@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import settings
-from api.routers import recommend, users, recipes, ingredients, interactions, detect, auth, cuisines, admin
+from api.routers import recommend, users, recipes, ingredients, interactions, detect, auth, cuisines, admin, recommendations
 from api.db import close_driver
 
 
@@ -46,6 +46,7 @@ app.add_middleware(
 # =====================================
 app.include_router(auth.router)
 app.include_router(recommend.router)
+app.include_router(recommendations.router)  # ✨ NEW: Recommendation Sessions
 app.include_router(users.router)
 app.include_router(recipes.router)
 app.include_router(ingredients.router)

@@ -1,10 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Star, Users, Heart } from 'lucide-react';
 import { apiService } from '../services/api';
 import { RecipeSearchRequest } from '../types/api';
 import { FoodSuggestion } from '../types';
+import { getUserId } from '../utils/auth';
 import './Home.css';
+
+// Helper function to format cuisine display (handles array, string, or concatenated string)
+const formatCuisine = (cuisine: string | string[] | undefined): string => {
+  if (!cuisine) return 'World';
+  
+  if (Array.isArray(cuisine)) {
+    if (cuisine.length > 0) {
+      // Join all cuisines with ", " (e.g., ["Thai", "Vietnamese"] -> "Thai, Vietnamese")
+      return cuisine.join(', ');
+    } else {
+      return 'World';
+    }
+  } else if (typeof cuisine === 'string') {
+    const cuisineStr = cuisine;
+    // Handle case where cuisine might be a concatenated string like "ThaiVietnamese"
+    // Common cuisine names that might be concatenated (sorted by length desc to match longer names first)
+    const commonCuisines = ['Middle Eastern', 'Mediterranean', 'Vietnamese', 'Caribbean', 'European', 'American', 'British', 'Chinese', 'Japanese', 'Korean', 'Indian', 'Italian', 'Spanish', 'French', 'Mexican', 'Greek', 'Asian', 'Thai'];
+    
+    // Try to split if it matches pattern of concatenated cuisines
+    let splitCuisines: string[] = [];
+    let remaining = cuisineStr;
+    
+    // Keep trying to match cuisines until we can't match any more
+    while (remaining.length > 0) {
+      let matched = false;
+      for (const cuisineName of commonCuisines) {
+        // Case-insensitive match
+        if (remaining.toLowerCase().startsWith(cuisineName.toLowerCase())) {
+          splitCuisines.push(cuisineName);
+          remaining = remaining.substring(cuisineName.length);
+          matched = true;
+          break;
+        }
+      }
+      // If no match found, break to avoid infinite loop
+      if (!matched) {
+        break;
+      }
+    }
+    
+    // If we successfully split into multiple cuisines and consumed entire string, use split version
+    // Otherwise, use original string (might be a single cuisine name we don't recognize)
+    if (splitCuisines.length > 1 && remaining.length === 0) {
+      return splitCuisines.join(', ');
+    } else {
+      return cuisineStr;
+    }
+  }
+  
+  return 'World';
+};
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -33,6 +85,8 @@ const Home: React.FC = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [likedRecipes, setLikedRecipes] = useState<Set<string>>(new Set());
+  const [isCuisineDropdownOpen, setIsCuisineDropdownOpen] = useState(false);
+  const cuisineDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadRecipes();
@@ -52,6 +106,23 @@ const Home: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [searchTerm, selectedCuisine, selectedDifficulty]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (cuisineDropdownRef.current && !cuisineDropdownRef.current.contains(event.target as Node)) {
+        setIsCuisineDropdownOpen(false);
+      }
+    };
+
+    if (isCuisineDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCuisineDropdownOpen]);
+
   const loadRecipes = async (pageNum: number = 1) => {
     setLoading(true);
     setError(null);
@@ -65,21 +136,24 @@ const Home: React.FC = () => {
       const response = await apiService.searchRecipes(request);
       
       if (response.data) {
-        const convertedRecipes = response.data.recipes.map(recipe => ({
-          id: recipe.recipe_id,
-          name: recipe.title,
-          description: recipe.instructions || `Delicious ${recipe.cuisine} dish`,
-          ingredients: recipe.ingredients?.map(ing => ing.ingredient_name) || [],
-          cookingTime: recipe.cook_time_min ? `${recipe.cook_time_min} minutes` : 'Unknown',
-          difficulty: 'Medium' as 'Easy' | 'Medium' | 'Hard', // Default difficulty
-          cuisine: recipe.cuisine || 'Unknown',
-          mealType: ['Lunch', 'Dinner'], // Default meal types
-          dietaryTags: recipe.allergens || [],
-          image: recipe.image_urls?.[0] || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
-          servings: recipe.servings,
-          ratingValue: recipe.rating_value,
-          ratingCount: recipe.rating_count
-        }));
+        const convertedRecipes = response.data.recipes.map(recipe => {
+          const formattedCuisine = formatCuisine(recipe.cuisine);
+          return {
+            id: recipe.recipe_id,
+            name: recipe.title,
+            description: recipe.instructions || `Delicious ${formattedCuisine} dish`,
+            ingredients: recipe.ingredients?.map(ing => ing.ingredient_name) || [],
+            cookingTime: recipe.cook_time_min ? `${recipe.cook_time_min} minutes` : 'Unknown',
+            difficulty: 'Medium' as 'Easy' | 'Medium' | 'Hard', // Default difficulty
+            cuisine: formattedCuisine,
+            mealType: ['Lunch', 'Dinner'], // Default meal types
+            dietaryTags: recipe.allergens || [],
+            image: recipe.image_urls?.[0] || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
+            servings: recipe.servings,
+            ratingValue: recipe.rating_value || 0,
+            ratingCount: recipe.rating_count || 0
+          };
+        });
 
         if (pageNum === 1) {
           setAllFoods(convertedRecipes);
@@ -102,7 +176,7 @@ const Home: React.FC = () => {
     }
   };
 
-  const searchRecipes = async () => {
+  const searchRecipes = async (pageNum: number = 1) => {
     setLoading(true);
     setError(null);
     
@@ -111,31 +185,38 @@ const Home: React.FC = () => {
         query: searchTerm || undefined,
         cuisine: selectedCuisine && selectedCuisine !== 'No Preference' ? selectedCuisine : undefined,
         limit: 20,
-        offset: 0
+        offset: (pageNum - 1) * 20
       };
 
       const response = await apiService.searchRecipes(request);
       
       if (response.data) {
-        const convertedRecipes = response.data.recipes.map(recipe => ({
-          id: recipe.recipe_id,
-          name: recipe.title,
-          description: recipe.instructions || `Delicious ${recipe.cuisine} dish`,
-          ingredients: recipe.ingredients?.map(ing => ing.ingredient_name) || [],
-          cookingTime: recipe.cook_time_min ? `${recipe.cook_time_min} minutes` : 'Unknown',
-          difficulty: 'Medium' as 'Easy' | 'Medium' | 'Hard',
-          cuisine: recipe.cuisine || 'Unknown',
-          mealType: ['Lunch', 'Dinner'],
-          dietaryTags: recipe.allergens || [],
-          image: recipe.image_urls?.[0] || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
-          servings: recipe.servings,
-          ratingValue: recipe.rating_value,
-          ratingCount: recipe.rating_count
-        }));
+        const convertedRecipes = response.data.recipes.map(recipe => {
+          const formattedCuisine = formatCuisine(recipe.cuisine);
+          return {
+            id: recipe.recipe_id,
+            name: recipe.title,
+            description: recipe.instructions || `Delicious ${formattedCuisine} dish`,
+            ingredients: recipe.ingredients?.map(ing => ing.ingredient_name) || [],
+            cookingTime: recipe.cook_time_min ? `${recipe.cook_time_min} minutes` : 'Unknown',
+            difficulty: 'Medium' as 'Easy' | 'Medium' | 'Hard',
+            cuisine: formattedCuisine,
+            mealType: ['Lunch', 'Dinner'],
+            dietaryTags: recipe.allergens || [],
+            image: recipe.image_urls?.[0] || 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
+            servings: recipe.servings,
+            ratingValue: recipe.rating_value || 0,
+            ratingCount: recipe.rating_count || 0
+          };
+        });
 
-        setAllFoods(convertedRecipes);
+        if (pageNum === 1) {
+          setAllFoods(convertedRecipes);
+        } else {
+          setAllFoods(prev => [...prev, ...convertedRecipes]);
+        }
         setHasMore(response.data.has_more);
-        setPage(1);
+        setPage(pageNum);
       } else if (response.error) {
         setError(response.error);
         loadMockData();
@@ -208,7 +289,13 @@ const Home: React.FC = () => {
   };
 
   const loadMore = () => {
-    if (hasMore && !loading) {
+    if (!hasMore || loading) return;
+
+    // If user is using search or cuisine filters, paginate the filtered search
+    if (searchTerm || selectedCuisine || selectedDifficulty) {
+      searchRecipes(page + 1);
+    } else {
+      // Otherwise, load next page of general recipes
       loadRecipes(page + 1);
     }
   };
@@ -227,7 +314,7 @@ const Home: React.FC = () => {
     }
 
     // For registered users, load from backend
-    const userId = localStorage.getItem('userId');
+    const userId = getUserId();
     if (!userId) return;
 
     try {
@@ -261,7 +348,7 @@ const Home: React.FC = () => {
     }
 
     // For registered users, update backend
-    const userId = localStorage.getItem('userId');
+    const userId = getUserId();
     if (!userId) {
       alert('Please sign in to like recipes.');
       return;
@@ -367,18 +454,54 @@ const Home: React.FC = () => {
               />
             </div>
             <div className="hero-cuisine-dropdown">
-              <select
-                value={selectedCuisine}
-                onChange={(e) => setSelectedCuisine(e.target.value)}
-                className="cuisine-select"
-              >
-                <option value="">All Cuisines</option>
-                {cuisines.map(cuisine => (
-                  <option key={cuisine.id} value={cuisine.name}>
-                    {cuisine.name}
-                  </option>
-                ))}
-              </select>
+              <div className="custom-dropdown" ref={cuisineDropdownRef}>
+                <div 
+                  className="custom-dropdown-select"
+                  onClick={() => setIsCuisineDropdownOpen(!isCuisineDropdownOpen)}
+                >
+                  <span className={`custom-dropdown-value ${!selectedCuisine ? 'placeholder' : ''}`}>
+                    {selectedCuisine || 'All Cuisines'}
+                  </span>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="custom-dropdown-arrow">
+                    <path d="M2 4L6 8L10 4" stroke="#9e9e9e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                </div>
+                {isCuisineDropdownOpen && (
+                  <div className="custom-dropdown-list">
+                    <div
+                      className={`custom-dropdown-item ${selectedCuisine === '' ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedCuisine('');
+                        setIsCuisineDropdownOpen(false);
+                      }}
+                    >
+                      All Cuisines
+                      {selectedCuisine === '' && (
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                    {cuisines.map(cuisine => (
+                      <div
+                        key={cuisine.id}
+                        className={`custom-dropdown-item ${selectedCuisine === cuisine.name ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedCuisine(cuisine.name);
+                          setIsCuisineDropdownOpen(false);
+                        }}
+                      >
+                        {cuisine.name}
+                        {selectedCuisine === cuisine.name && (
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

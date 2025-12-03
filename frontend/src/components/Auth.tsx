@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/api';
+import { setUserId } from '../utils/auth';
 import './Auth.css';
 
 const Auth: React.FC = () => {
@@ -24,7 +25,6 @@ const Auth: React.FC = () => {
     name: '',
     username: '',
     password: '',
-    confirmPassword: '',
     age: '',
     gender: ''
   });
@@ -36,7 +36,35 @@ const Auth: React.FC = () => {
   });
   
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
+  const genderDropdownRef = useRef<HTMLDivElement>(null);
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
+  
+  const genderOptions = [
+    { id: 'male', name: 'Male' },
+    { id: 'female', name: 'Female' },
+    { id: 'other', name: 'Other' }
+  ];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (genderDropdownRef.current && !genderDropdownRef.current.contains(event.target as Node)) {
+        setIsGenderDropdownOpen(false);
+      }
+    };
+
+    if (isGenderDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isGenderDropdownOpen]);
 
   // Sign Up handlers
   const handleSignUpChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -45,33 +73,53 @@ const Auth: React.FC = () => {
       ...prev,
       [name]: value
     }));
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
     setError(null);
   };
 
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const newFieldErrors: {[key: string]: string} = {};
+
+    // Validate required fields
+    if (!signUpData.username) {
+      newFieldErrors.username = 'Please enter your username';
+    } else if (signUpData.username.length < 8) {
+      newFieldErrors.username = 'Username must be at least 8 characters';
+    }
+    if (!signUpData.password) {
+      newFieldErrors.password = 'Please enter your password';
+    }
+    if (!signUpData.age) {
+      newFieldErrors.age = 'Please enter your age';
+    } else {
+      const age = parseInt(signUpData.age);
+      if (isNaN(age) || age < 1 || age > 150) {
+        newFieldErrors.age = 'Please enter a valid age (1-150)';
+      }
+    }
+    if (!signUpData.gender) {
+      newFieldErrors.gender = 'Please select a gender';
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      setIsSubmitting(false);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      if (!signUpData.username || !signUpData.password || !signUpData.confirmPassword || !signUpData.age || !signUpData.gender) {
-        setError('Please fill in all required fields');
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (signUpData.password !== signUpData.confirmPassword) {
-        setError('Passwords do not match');
-        setIsSubmitting(false);
-        return;
-      }
-
       const age = parseInt(signUpData.age);
-      if (isNaN(age) || age < 1 || age > 150) {
-        setError('Invalid age');
-        setIsSubmitting(false);
-        return;
-      }
 
       const response = await apiService.signUp({
         username: signUpData.username,
@@ -90,10 +138,24 @@ const Auth: React.FC = () => {
         }
         navigate('/onboarding');
       } else {
-        setError(response.error || 'Sign up failed');
+        // Check if error is about username already exists
+        const errorMessage = response.error || 'Sign up failed';
+        if (errorMessage.toLowerCase().includes('username already exists') || 
+            errorMessage.toLowerCase().includes('username') && errorMessage.toLowerCase().includes('already')) {
+          setFieldErrors({ username: 'This username is already taken. Please choose another one.' });
+        } else {
+          setError(errorMessage);
+        }
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (err: any) {
+      // Check if error is about username already exists
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      if (errorMessage.toLowerCase().includes('username already exists') || 
+          (errorMessage.toLowerCase().includes('username') && errorMessage.toLowerCase().includes('already'))) {
+        setFieldErrors({ username: 'This username is already taken. Please choose another one.' });
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -106,20 +168,39 @@ const Auth: React.FC = () => {
       ...prev,
       [name]: value
     }));
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
     setError(null);
   };
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const newFieldErrors: {[key: string]: string} = {};
+
+    // Validate required fields
+    if (!signInData.username) {
+      newFieldErrors.username = 'Please enter your username';
+    }
+    if (!signInData.password) {
+      newFieldErrors.password = 'Please enter your password';
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      setIsSubmitting(false);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      if (!signInData.username || !signInData.password) {
-        setError('Please fill in all required fields');
-        setIsSubmitting(false);
-        return;
-      }
 
       const response = await apiService.signIn({
         username: signInData.username,
@@ -128,11 +209,12 @@ const Auth: React.FC = () => {
 
       if (response.data) {
         setUser(response.data);
-        localStorage.setItem('userId', response.data.user_id);
         // Store JWT token
         if (response.data.access_token) {
           localStorage.setItem('access_token', response.data.access_token);
         }
+        // Store userId (authenticated user - use localStorage)
+        setUserId(response.data.user_id, false);
         // Load full user profile from database to get completed_onboarding and other fields
         await loadUserProfile(response.data.user_id);
         navigate('/');
@@ -155,7 +237,8 @@ const Auth: React.FC = () => {
       const response = await apiService.createUser();
       if (response.data) {
         setUser(response.data);
-        localStorage.setItem('userId', response.data.user_id);
+        // Store userId (guest user - use sessionStorage)
+        setUserId(response.data.user_id, true);
         navigate('/onboarding');
       } else {
         setError(response.error || 'Failed to create guest account. Please make sure the backend server is running.');
@@ -180,6 +263,7 @@ const Auth: React.FC = () => {
             onClick={() => {
               setActiveTab('signup');
               setError(null);
+              setFieldErrors({});
             }}
           >
             Sign Up
@@ -189,6 +273,7 @@ const Auth: React.FC = () => {
             onClick={() => {
               setActiveTab('signin');
               setError(null);
+              setFieldErrors({});
             }}
           >
             Sign In
@@ -203,16 +288,16 @@ const Auth: React.FC = () => {
               <p>Create an account for a better experience</p>
             </div>
 
-            <form onSubmit={handleSignUpSubmit} className="auth-form">
+            <form onSubmit={handleSignUpSubmit} className="auth-form" noValidate>
               <div className="form-group">
-                <label htmlFor="name">Name</label>
+                <label htmlFor="name">Full Name</label>
                 <input
                   type="text"
                   id="name"
                   name="name"
                   value={signUpData.name}
                   onChange={handleSignUpChange}
-                  placeholder="Enter your name"
+                  placeholder="Enter your full name"
                 />
               </div>
 
@@ -225,34 +310,47 @@ const Auth: React.FC = () => {
                   value={signUpData.username}
                   onChange={handleSignUpChange}
                   placeholder="Enter username"
-                  required
+                  className={fieldErrors.username ? 'error' : ''}
                 />
+                {fieldErrors.username && (
+                  <span className="field-error">{fieldErrors.username}</span>
+                )}
               </div>
 
               <div className="form-group">
                 <label htmlFor="password">Password</label>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  value={signUpData.password}
-                  onChange={handleSignUpChange}
-                  placeholder="Enter password"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="confirmPassword">Confirm Password</label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={signUpData.confirmPassword}
-                  onChange={handleSignUpChange}
-                  placeholder="Confirm your password"
-                  required
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showSignUpPassword ? "text" : "password"}
+                    id="password"
+                    name="password"
+                    value={signUpData.password}
+                    onChange={handleSignUpChange}
+                    placeholder="Enter password"
+                    className={fieldErrors.password ? 'error' : ''}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                    aria-label={showSignUpPassword ? "Hide password" : "Show password"}
+                  >
+                    {showSignUpPassword ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                        <line x1="1" y1="1" x2="23" y2="23" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                        <circle cx="12" cy="12" r="3" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {fieldErrors.password && (
+                  <span className="field-error">{fieldErrors.password}</span>
+                )}
               </div>
 
               <div className="form-group">
@@ -266,24 +364,62 @@ const Auth: React.FC = () => {
                   placeholder="Enter your age"
                   min="1"
                   max="150"
-                  required
+                  className={fieldErrors.age ? 'error' : ''}
                 />
+                {fieldErrors.age && (
+                  <span className="field-error">{fieldErrors.age}</span>
+                )}
               </div>
 
               <div className="form-group">
                 <label htmlFor="gender">Gender</label>
-                <select
-                  id="gender"
-                  name="gender"
-                  value={signUpData.gender}
-                  onChange={handleSignUpChange}
-                  required
-                >
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
+                <div className="custom-dropdown" ref={genderDropdownRef}>
+                  <div 
+                    className={`custom-dropdown-select ${fieldErrors.gender ? 'error' : ''}`}
+                    onClick={() => setIsGenderDropdownOpen(!isGenderDropdownOpen)}
+                  >
+                    <span className={`custom-dropdown-value ${!signUpData.gender ? 'placeholder' : ''}`}>
+                      {signUpData.gender 
+                        ? genderOptions.find(g => g.id === signUpData.gender)?.name || 'Select gender'
+                        : 'Select gender'}
+                    </span>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="custom-dropdown-arrow">
+                      <path d="M2 4L6 8L10 4" stroke="#9e9e9e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                    </svg>
+                  </div>
+                  {isGenderDropdownOpen && (
+                    <div className="custom-dropdown-list">
+                      {genderOptions.map(option => (
+                        <div
+                          key={option.id}
+                          className={`custom-dropdown-item ${signUpData.gender === option.id ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSignUpData(prev => ({ ...prev, gender: option.id }));
+                            setIsGenderDropdownOpen(false);
+                            // Clear gender error when selected
+                            if (fieldErrors.gender) {
+                              setFieldErrors(prev => {
+                                const newErrors = { ...prev };
+                                delete newErrors.gender;
+                                return newErrors;
+                              });
+                            }
+                          }}
+                        >
+                          {option.name}
+                          {signUpData.gender === option.id && (
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {fieldErrors.gender && (
+                  <span className="field-error">{fieldErrors.gender}</span>
+                )}
               </div>
 
               {error && (
@@ -322,7 +458,7 @@ const Auth: React.FC = () => {
               <p>Welcome back!</p>
             </div>
 
-            <form onSubmit={handleSignInSubmit} className="auth-form">
+            <form onSubmit={handleSignInSubmit} className="auth-form" noValidate>
               <div className="form-group">
                 <label htmlFor="signin-username">Username</label>
                 <input
@@ -332,21 +468,47 @@ const Auth: React.FC = () => {
                   value={signInData.username}
                   onChange={handleSignInChange}
                   placeholder="Enter username"
-                  required
+                  className={fieldErrors.username ? 'error' : ''}
                 />
+                {fieldErrors.username && (
+                  <span className="field-error">{fieldErrors.username}</span>
+                )}
               </div>
 
               <div className="form-group">
                 <label htmlFor="signin-password">Password</label>
-                <input
-                  type="password"
-                  id="signin-password"
-                  name="password"
-                  value={signInData.password}
-                  onChange={handleSignInChange}
-                  placeholder="Enter password"
-                  required
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showSignInPassword ? "text" : "password"}
+                    id="signin-password"
+                    name="password"
+                    value={signInData.password}
+                    onChange={handleSignInChange}
+                    placeholder="Enter password"
+                    className={fieldErrors.password ? 'error' : ''}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowSignInPassword(!showSignInPassword)}
+                    aria-label={showSignInPassword ? "Hide password" : "Show password"}
+                  >
+                    {showSignInPassword ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                        <line x1="1" y1="1" x2="23" y2="23" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                        <circle cx="12" cy="12" r="3" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {fieldErrors.password && (
+                  <span className="field-error">{fieldErrors.password}</span>
+                )}
               </div>
 
               {error && (

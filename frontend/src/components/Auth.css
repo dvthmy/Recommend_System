@@ -91,34 +91,216 @@
   font-size: 0.9rem;
 }
 
-.form-group input,
-.form-group select {
+.form-group input {
   width: 100%;
-  padding: 0.75rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: border-color 0.3s;
+  padding: 14px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 16px;
+  background-color: #fafafa;
+  color: #212121;
+  transition: all 0.2s ease;
   box-sizing: border-box;
-  font-family: inherit;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  min-height: 48px;
+  height: 52px;
 }
 
-.form-group input:focus,
-.form-group select:focus {
+.form-group input:focus {
   outline: none;
   border-color: #8b5a3c;
+  box-shadow: 0 0 0 3px rgba(139, 90, 60, 0.1);
 }
 
 .form-group input::placeholder {
   color: #999;
 }
 
+.form-group input:hover {
+  border-color: #bdbdbd;
+}
+
+.form-group input.error {
+  border-color: #f44336;
+}
+
+.form-group input.error:focus {
+  border-color: #f44336;
+  box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.1);
+}
+
+.field-error {
+  display: block;
+  color: #f44336;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-input-wrapper input {
+  padding-right: 50px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  transition: color 0.2s ease;
+}
+
+.password-toggle:hover {
+  color: #666;
+}
+
+.password-toggle:focus {
+  outline: none;
+}
+
 .form-group select {
+  width: 100%;
+  height: 52px;
+  min-height: 48px;
+  padding: 14px 48px 14px 18px;
+  padding-right: 40px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 16px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  color: #212121;
+  background-color: #fafafa;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath stroke='%239e9e9e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none' d='M2 4L6 8L10 4'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  padding-right: 2.5rem;
+  background-position: right 18px center;
+}
+
+.form-group select:hover {
+  border-color: #bdbdbd;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: #bdbdbd;
+}
+
+/* Custom Dropdown Styles (same as Onboarding) */
+.form-group .custom-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.form-group .custom-dropdown-select {
+  width: 100%;
+  padding: 14px 48px 14px 18px;
+  padding-right: 40px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 16px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  color: #212121;
+  background-color: #fafafa;
+  transition: all 0.2s ease;
+  min-height: 48px;
+  height: 52px;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  line-height: 22px;
+}
+
+.form-group .custom-dropdown-select:hover {
+  border-color: #bdbdbd;
+}
+
+.form-group .custom-dropdown-select.error {
+  border-color: #f44336;
+}
+
+.form-group .custom-dropdown-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-group .custom-dropdown-value.placeholder {
+  color: #999;
+}
+
+.form-group .custom-dropdown-arrow {
+  flex-shrink: 0;
+  margin-left: 12px;
+  transition: transform 0.2s ease;
+}
+
+.form-group .custom-dropdown.open .custom-dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.form-group .custom-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+  margin-top: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.form-group .custom-dropdown-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  color: #212121;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background-color 0.2s ease;
+}
+
+.form-group .custom-dropdown-item:first-child {
+  border-radius: 12px 12px 0 0;
+}
+
+.form-group .custom-dropdown-item:last-child {
+  border-radius: 0 0 12px 12px;
+}
+
+.form-group .custom-dropdown-item:hover {
+  background-color: #f5f5f5;
+}
+
+.form-group .custom-dropdown-item.selected {
+  background-color: #e8f5e9;
+  color: #212121;
+}
+
+.form-group .custom-dropdown-item.selected svg {
+  flex-shrink: 0;
 }
 
 .error-message {

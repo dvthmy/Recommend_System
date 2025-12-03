@@ -14,8 +14,8 @@ class RecommendRequest(BaseModel):
     max_cook_time: Optional[int] = None
     recipe_category: Optional[str] = None
     preferred_cuisines: Optional[List[str]] = None
-    limit: int = 10
-    min_match_ratio: float = 0.6
+    limit: int = 20
+    min_match_ratio: float = 0.3
 
 
 @router.post("/", summary="Get recipe recommendations")
@@ -31,7 +31,7 @@ async def post_recommend(req: RecommendRequest):
     - recipe_category: Filter by recipe category/meal type (use 'no preference'/'none'/'all' for no filter)
     - preferred_cuisines: List of preferred cuisines for priority ranking (use "All" for no preference)
     - limit: Maximum number of results
-    - min_match_ratio: Minimum Jaccard match ratio (default: 0.6)
+    - min_match_ratio: Minimum Jaccard match ratio (default: 0.3)
     """
     try:
         # Normalize preferred_cuisines: "All" = None (no preference)
@@ -80,8 +80,8 @@ async def get_recommend(
     max_cook_time: Optional[int] = Query(None, description="Maximum cooking time in minutes"),
     recipe_category: Optional[str] = Query(None, description="Filter by recipe category (use 'no preference'/'none'/'all' for no filter)"),
     preferred_cuisines: Optional[str] = Query(None, description="Comma-separated preferred cuisines (e.g., 'Korean,Vietnamese,American' or 'All' for no preference)"),
-    limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
-    min_match_ratio: float = Query(0.6, ge=0.0, le=1.0, description="Minimum Jaccard match ratio"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of results"),
+    min_match_ratio: float = Query(0.3, ge=0.0, le=1.0, description="Minimum Jaccard match ratio (default: 0.3)"),
 ):
     """
     GET variant for quick testing.

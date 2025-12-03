@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { apiService } from '../services/api';
+import { getUserId, isGuestUserId } from '../utils/auth';
+import { useUser } from '../contexts/UserContext';
 import './History.css';
 
 interface RecipeCard {
@@ -18,11 +20,16 @@ interface RecipeCard {
 
 const History: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useUser();
   const [activeTab, setActiveTab] = useState<'liked' | 'rated' | 'viewed'>('viewed');
   const [recipes, setRecipes] = useState<RecipeCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [likedRecipes, setLikedRecipes] = useState<Set<string>>(new Set());
+  
+  // Check if user is guest
+  const hasAccessToken = !!localStorage.getItem('access_token');
+  const isGuest = !hasAccessToken || (user && user.user_id && isGuestUserId(user.user_id));
 
   useEffect(() => {
     loadLikedRecipes();
@@ -134,8 +141,14 @@ const History: React.FC = () => {
     setLoading(true);
     setError(null);
     
+    // If guest user, don't load recipes - show login prompt instead
+    if (isGuest) {
+      setLoading(false);
+      return;
+    }
+    
     try {
-      const userId = localStorage.getItem('userId');
+      const userId = getUserId();
       if (!userId) {
         setError('User not found');
         setLoading(false);
@@ -349,6 +362,61 @@ const History: React.FC = () => {
       return '';
     }
   };
+
+  // Show login prompt for guest users
+  if (isGuest) {
+    return (
+      <div className="activity-container">
+        <div className="container">
+          <div className="activity-header">
+            <h1>My Activity</h1>
+          </div>
+          
+          <div className="guest-prompt" style={{
+            textAlign: 'center',
+            padding: '4rem 2rem',
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            marginTop: '2rem'
+          }}>
+            <h2 style={{ 
+              fontSize: '1.5rem', 
+              fontWeight: '600', 
+              marginBottom: '0.5rem',
+              color: '#333'
+            }}>
+              Sign in to view your activity history
+            </h2>
+            <p style={{ 
+              fontSize: '1rem', 
+              color: '#666', 
+              marginBottom: '2rem',
+              lineHeight: '1.6'
+            }}>
+              Please sign in or create an account to view your history of viewed, liked, and rated recipes.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button
+                onClick={() => navigate('/signin')}
+                className="btn btn-outline btn-lg"
+                style={{ minWidth: '150px' }}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => navigate('/signup')}
+                className="btn btn-primary btn-lg"
+                style={{ minWidth: '150px' }}
+              >
+                Sign Up
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

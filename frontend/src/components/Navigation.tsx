@@ -60,8 +60,18 @@ const Navigation: React.FC<NavigationProps> = ({ isLoggedIn: propIsLoggedIn }: N
           <div className="nav-user">
             {isLoggedIn ? (
               <div className="user-menu">
-                <Link to="/profile" className="user-avatar">
-                  {user?.username || 'Profile'}
+                <Link to="/profile" className="user-avatar" title={user?.name || user?.username || 'Profile'}>
+                  {user?.avatar_url ? (
+                    <img 
+                      src={user.avatar_url} 
+                      alt="Avatar" 
+                      className="user-avatar-image"
+                    />
+                  ) : (
+                    <span className="user-avatar-initials">
+                      {user?.name ? user.name.charAt(0).toUpperCase() : (user?.username ? user.username.charAt(0).toUpperCase() : 'U')}
+                    </span>
+                  )}
                 </Link>
               </div>
             ) : (

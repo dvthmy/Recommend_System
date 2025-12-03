@@ -129,6 +129,19 @@
   margin-right: auto;
 }
 
+.options-grid-cuisine {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+  flex: 1;
+  justify-items: center;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .options-grid.single-select {
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 }
@@ -340,6 +353,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.custom-dropdown-value.placeholder {
+  color: #999;
 }
 
 .custom-dropdown-arrow {
@@ -627,9 +644,15 @@
     gap: var(--spacing-md);
   }
   
+  .options-grid-cuisine {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+  }
+  
   .option-card {
     padding: var(--spacing-lg);
     min-height: 100px;
+    width: 100%;
   }
   
   .cuisine-flag,
