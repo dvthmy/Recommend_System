@@ -6,10 +6,9 @@ import tempfile, os, time
 # ✅ Khởi tạo router
 router = APIRouter(prefix="/detect", tags=["Detection"])
 
-# ✅ Cấu hình API key Gemini
-#genai.configure(api_key="AIzaSyAlaSpeltP5wniCnzbygZVGUUyVSct3bw0")
-
-genai.configure(api_key="AIzaSyAlaSpeltP5wniCnzbygZVGUUyVSct3bw0")
+# ✅ Cấu hình API key Gemini từ biến môi trường
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+genai.configure(api_key=GEMINI_API_KEY)
 
 # ✅ Prompt nhận dạng nguyên liệu
 PROMPT = """
