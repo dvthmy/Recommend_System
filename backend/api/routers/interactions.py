@@ -14,7 +14,6 @@ class InteractionRequest(BaseModel):
     recipe_id: str
     event_type: str = Field(..., pattern="^(view|like|rating)$")
     rating: Optional[int] = Field(None, ge=1, le=5)
-    session_id: Optional[str] = None  # ✨ Link to recommendation session
 
 
 # ========================
@@ -39,9 +38,8 @@ async def record_interaction(
             MATCH (r:Recipe {recipe_id:$rid})
             MERGE (u)-[rel:INTERACTED_WITH]->(r)
             ON CREATE SET rel.created_at = datetime()
-            SET rel.updated_at = datetime(),
-                rel.from_session = $session_id
-        """, uid=user_id, rid=body.recipe_id, session_id=body.session_id)
+            SET rel.updated_at = datetime()
+        """, uid=user_id, rid=body.recipe_id)
 
         # ===================
         # 👁️ View Event

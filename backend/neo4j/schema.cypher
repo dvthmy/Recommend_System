@@ -17,10 +17,6 @@ FOR (u:User)
 REQUIRE u.user_id IS UNIQUE;
 
 // Optional helper labels
-CREATE CONSTRAINT tag_name_unique IF NOT EXISTS
-FOR (t:Tag)
-REQUIRE t.name IS UNIQUE;
-
 CREATE CONSTRAINT cuisine_name_unique IF NOT EXISTS
 FOR (c:Cuisine)
 REQUIRE c.name IS UNIQUE;
@@ -113,7 +109,7 @@ ON EACH [i.canonical_name, i.alt_names];
 //   meal_preferences: list<string>,
 //   allergies: list<string>, // ingredient_ids (denormalized)
 //   disliked_ingredients: list<string>, // ingredient_ids (denormalized)
-//   explicit_preferences: { fav_cuisines: list<string>, fav_tags: list<string>, disliked_cuisines: list<string> },
+//   explicit_preferences: { fav_cuisines: list<string>, disliked_cuisines: list<string> },
 //   skill_level: string,
 //   max_cook_time: integer,
 //   time_constraints: { max_cook_time: integer },
@@ -131,13 +127,11 @@ ON EACH [i.canonical_name, i.alt_names];
 // Relationships
 //========================
 // (r:Recipe)-[:HAS_INGREDIENT {qty: float, unit: string, optional: boolean, prep: string}]->(i:Ingredient)
-// (r:Recipe)-[:TAGGED_AS]->(t:Tag)
 // (r:Recipe)-[:OF_CUISINE]->(c:Cuisine)
 // (u:User)-[:HAS_IN_PANTRY {qty: float, unit: string, last_updated: datetime}]->(i:Ingredient)
 // (u:User)-[:DISLIKES]->(i:Ingredient)
 // (u:User)-[:ALLERGIC_TO]->(i:Ingredient)
 // (u:User)-[:FAVORS_CUISINE]->(c:Cuisine)
-// (u:User)-[:FAVORS_TAG]->(t:Tag)
 // (u:User)-[:INTERACTED_WITH {event_type: string, timestamp: datetime, rating: float}]->(r:Recipe)
 
 //========================
@@ -161,13 +155,9 @@ ON EACH [i.canonical_name, i.alt_names];
 //   "variations": {}
 // }
 
-// Recipe node and link to cuisine and tags
+// Recipe node and link to cuisine
 // MERGE (r:Recipe {recipe_id: $recipe_id})
 // SET r += $recipe_props
-// WITH r
-// UNWIND $tags AS tagName
-//   MERGE (t:Tag {name: tagName})
-//   MERGE (r)-[:TAGGED_AS]->(t)
 // WITH r
 // MERGE (c:Cuisine {name: $cuisine})
 // MERGE (r)-[:OF_CUISINE]->(c);

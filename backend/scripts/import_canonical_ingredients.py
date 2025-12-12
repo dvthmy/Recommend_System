@@ -255,8 +255,8 @@ def main():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=1000,
-        help="Batch size for import"
+        default=5000,
+        help="Batch size for import (default: 5000 for faster import)"
     )
     parser.add_argument(
         "--verbose",

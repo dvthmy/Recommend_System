@@ -14,7 +14,7 @@
     - `locale: "vi-VN"`
     - `skill_level: "beginner"`
     - `max_cook_time: 60`
-    - `dietary_preferences: []`
+    - `meal_preferences: []`
   - Tạo JWT token
   - Trả về UserProfile + access_token
 - Frontend lưu: `userId` và `access_token` vào localStorage

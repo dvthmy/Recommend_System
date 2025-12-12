@@ -158,18 +158,10 @@ class RecommendationReason:
     confidence: float  # 0.0 to 1.0
     
     def __str__(self):
-        emoji_map = {
-            "ingredient_match": "✅",
-            "cuisine_match": "🍜",
-            "group_popular": "👥",
-            "time_match": "⏱️",
-            "dietary_match": "🥗",
-            "category_match": "🍽️",
-            "health_match": "💚",
-            "allergen_safe": "🛡️"
-        }
-        emoji = emoji_map.get(self.rule_type, "•")
-        return f"{emoji} {self.description}"
+        # QUAN TRỌNG: description đã có emoji rồi (ví dụ: "🍜 Matches your favorite cuisine")
+        # Không cần thêm emoji từ emoji_map nữa để tránh duplicate
+        # Chỉ return description trực tiếp
+        return self.description
 
 
 # =========================================================
@@ -182,8 +174,8 @@ class KnowledgeBasedRecommender:
     NO machine learning, NO collaborative filtering.
     """
     
-    def __init__(self, uri="bolt://localhost:7687", username="neo4j",
-                 password="Admin123!", database="test"):
+    def __init__(self, uri="neo4j+s://3b0d8961.databases.neo4j.io", username="neo4j",
+                 password="qV5l-Ck8vasO5qoM65gjWhuJTa2HBr4e6KwSYJ0RfT0", database="neo4j"):
         self.driver = GraphDatabase.driver(uri, auth=(username, password))
         self.database = database
         
@@ -220,7 +212,8 @@ class KnowledgeBasedRecommender:
         MATCH (u:User {user_id: $uid})
         OPTIONAL MATCH (u)-[:ALLERGIC_TO]->(a:Ingredient)
         OPTIONAL MATCH (u)-[:FAVORS_CUISINE]->(c:Cuisine)
-        OPTIONAL MATCH (u)-[:DISLIKES]->(d:Ingredient)
+        // DISLIKES relationship không tồn tại trong database, bỏ qua để tránh warning
+        // OPTIONAL MATCH (u)-[:DISLIKES]->(d:Ingredient)
         RETURN 
             u.user_id AS user_id,
             coalesce(u.gender, 'unknown') AS gender,
@@ -228,8 +221,7 @@ class KnowledgeBasedRecommender:
             collect(DISTINCT a.ingredient_id) AS allergies,
             collect(DISTINCT c.name) AS favorite_cuisines,
             u.max_cook_time AS max_cook_time,
-            coalesce(u.meal_preferences, []) AS meal_preferences,
-            collect(DISTINCT d.ingredient_id) AS dislikes
+            coalesce(u.meal_preferences, []) AS meal_preferences
         """
         
         result = session.run(q, uid=user_id).single()
@@ -255,7 +247,7 @@ class KnowledgeBasedRecommender:
             favorite_cuisines=[c.lower() for c in (result['favorite_cuisines'] or [])],
             max_cook_time=result['max_cook_time'],
             meal_preferences=result['meal_preferences'] or [],
-            dietary_restrictions=result['dislikes'] or []
+            dietary_restrictions=[]  # DISLIKES relationship không tồn tại, set empty list
         )
     
     def extract_group_knowledge(self, session, gender: str, age_group: str) -> Optional[GroupKnowledge]:
@@ -429,15 +421,31 @@ class KnowledgeBasedRecommender:
                 confidence=1.0
             )
         
-        # Check cuisine group match
+        # Check cuisine match (exact or group)
+        # Priority 1: exact match → "🍜 Matches your favorite cuisine"
+        # Priority 2: group match → "🍲 Similar to your preferred cuisine group"
         for user_cuisine in user.favorite_cuisines:
+            user_cuisine_lower = user_cuisine.lower().strip()
+            recipe_cuisines_lower = [rc.lower().strip() for rc in recipe.cuisines if rc]
+            
+            # Check exact match first (Priority 1)
+            if any(user_cuisine_lower == rc for rc in recipe_cuisines_lower):
+                return RecommendationReason(
+                    rule_type="cuisine_match",
+                    description="🍜 Matches your favorite cuisine",
+                    confidence=0.8
+                )
+            
+            # Check group match (Priority 2)
             for group_name, group_cuisines in self.cuisine_hierarchy.items():
-                if user_cuisine in [c.lower() for c in group_cuisines]:
-                    # User likes this cuisine group
-                    if any(rc in [c.lower() for c in group_cuisines] for rc in recipe.cuisines):
+                group_cuisines_lower = [c.lower() for c in group_cuisines]
+                # User likes this cuisine group
+                if user_cuisine_lower in group_cuisines_lower:
+                    # Recipe cuisine is in the same group
+                    if any(rc in group_cuisines_lower for rc in recipe_cuisines_lower):
                         return RecommendationReason(
                             rule_type="cuisine_match",
-                            description=f"Similar to your preferred {group_name.lower()} cuisine",
+                            description="🍲 Similar to your preferred cuisine group",
                             confidence=0.7
                         )
         
@@ -763,10 +771,10 @@ class KnowledgeBasedRecommender:
 
 def main():
     parser = argparse.ArgumentParser(description="Pure Knowledge-Based Recipe Recommender")
-    parser.add_argument("--uri", default="bolt://localhost:7687")
+    parser.add_argument("--uri", default="neo4j+s://3b0d8961.databases.neo4j.io")
     parser.add_argument("--user", default="neo4j")
-    parser.add_argument("--password", default="Admin123!")
-    parser.add_argument("--db", dest="database", default="test")
+    parser.add_argument("--password", default="qV5l-Ck8vasO5qoM65gjWhuJTa2HBr4e6KwSYJ0RfT0")
+    parser.add_argument("--db", dest="database", default="neo4j")
     parser.add_argument("--user-id", dest="user_id", required=True, help="User ID")
     parser.add_argument("--ingredients", dest="ingredients", help="Comma-separated ingredient IDs")
     parser.add_argument("--limit", type=int, default=20)

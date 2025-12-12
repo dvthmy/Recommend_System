@@ -269,7 +269,15 @@ const History: React.FC = () => {
         return timeB - timeA;
       });
 
-      setRecipes(allRecipes);
+      // Deduplicate by recipe id: keep only the most recent interaction per recipe
+      const uniqueById: Map<string, RecipeCard> = new Map();
+      for (const r of allRecipes) {
+        if (!uniqueById.has(r.id)) {
+          uniqueById.set(r.id, r);
+        }
+      }
+
+      setRecipes(Array.from(uniqueById.values()));
     } catch (err) {
       console.error('Failed to load recipes:', err);
       setError(err instanceof Error ? err.message : 'Failed to load recipes');
@@ -498,8 +506,8 @@ const History: React.FC = () => {
                       className="favorite-icon" 
                       size={20} 
                       strokeWidth={2}
-                      fill={likedRecipes.has(recipe.id) ? '#FF6B35' : 'transparent'}
-                      color={likedRecipes.has(recipe.id) ? '#FF6B35' : '#666666'}
+                      fill={likedRecipes.has(recipe.id) ? 'currentColor' : 'transparent'}
+                      color="currentColor"
                     />
                   </button>
                 </div>

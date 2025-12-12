@@ -1,5 +1,5 @@
 from typing import List, Union
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -8,10 +8,11 @@ class Settings(BaseSettings):
     API_VERSION: str = "1.0.0"
 
     # ===== Neo4j Configuration =====
-    NEO4J_URI: str = "bolt://localhost:7687"
+    # Default to Neo4j Aura - can be overridden via .env file
+    NEO4J_URI: str = "neo4j+s://3b0d8961.databases.neo4j.io"
     NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "Admin123!"
-    NEO4J_DATABASE: str = "test"
+    NEO4J_PASSWORD: str = "qV5l-Ck8vasO5qoM65gjWhuJTa2HBr4e6KwSYJ0RfT0"
+    NEO4J_DATABASE: str = "neo4j"
 
     # ===== CORS =====
     # Supports list or comma-separated string
@@ -22,9 +23,15 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    # ===== Gemini API Configuration =====
+    GEMINI_API_KEY: str = ""  # Set via .env file or environment variable
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"  # Ignore extra fields from .env that don't match model fields
+    )
 
 
 settings = Settings()

@@ -387,13 +387,9 @@ const Onboarding: React.FC = () => {
   ];
 
   const mealTypes = [
-    { id: 'main_dishes', name: '🍽️ Main Dishes', description: 'Entrees, main courses ' },
-    { id: 'appetizers', name: '🍤 Appetizers', description: 'Starters, finger foods ' },
-    { id: 'desserts', name: '🎂 Desserts', description: 'Cakes, sweets, pastries ' },
-    { id: 'beverages', name: '🍹 Beverages', description: 'Drinks, smoothies, cocktails' },
-    { id: 'side_dishes', name: '🥗 Side Dishes', description: 'Sides, salads' },
-    { id: 'breakfast', name: '☕ Breakfast', description: 'Breakfast items ' },
-    { id: 'snacks', name: '🍪 Snacks', description: 'Light snacks' }
+    { id: 'main_dish', name: '🍽️ Main Dish', description: 'Dinner, lunch, breakfast, entrees, side dishes, appetizers, soups, salads, pasta, sandwiches' },
+    { id: 'dessert', name: '🎂 Dessert', description: 'Cakes, pies, cookies, pastries, sweets, ice cream, pudding, muffins, brownies' },
+    { id: 'drink', name: '🍹 Drink', description: 'Beverages, cocktails, coffee, tea, juice, smoothies, shakes, soda, wine, beer' }
   ];
 
   const cookingTimeOptions = [
@@ -686,15 +682,11 @@ const Onboarding: React.FC = () => {
 
       // Get meal type name from preferences
       const selectedMealType = preferences.preferredMealTypes[0];
-      // Map meal type ID to backend meal type value
+      // Map meal type ID to backend meal type value (must match CategoryMapper.MAIN_GROUPS keys)
       const mealTypeMapping: { [key: string]: string } = {
-        'main_dishes': 'Main Dishes',
-        'appetizers': 'Appetizers',
-        'desserts': 'Desserts',
-        'beverages': 'Beverages',
-        'side_dishes': 'Side Dishes',
-        'breakfast': 'Breakfast',
-        'snacks': 'Snacks'
+        'main_dish': 'Main dish',  // Must match exactly with backend: "Main dish"
+        'dessert': 'Dessert',       // Must match exactly with backend: "Dessert"
+        'drink': 'Drink'            // Must match exactly with backend: "Drink"
       };
       const mealTypeName = mealTypeMapping[selectedMealType] || selectedMealType;
       
@@ -824,11 +816,45 @@ const Onboarding: React.FC = () => {
       }
       // If "No Preference" is selected, we don't add any cuisines (returns None/null)
       
+      // Update diets (create Diet nodes and FOLLOWS_DIET relationships automatically)
+      // Similar to how Cuisine nodes are created automatically
+      if (dietaryMode && dietaryMode !== 'none') {
+        const dietsToCreate: string[] = [];
+        
+        if (dietaryMode === 'bmi_based') {
+          // For BMI-based, don't create Diet nodes (dietary_plan is set in profile instead)
+          // Diet nodes are for explicit dietary restrictions like vegan, vegetarian, etc.
+          // BMI-based plans are handled via dietary_plan field, not Diet nodes
+        } else {
+          // For explicit dietary modes, create Diet nodes
+          // Map dietaryMode to diet name (same as backend expects)
+          dietsToCreate.push(dietaryMode);
+        }
+        
+        // Only update if we have diets to create
+        if (dietsToCreate.length > 0) {
+          try {
+            await apiService.updateUserDiets(currentUserId, { diets: dietsToCreate });
+            console.log(`✅ Created Diet nodes: ${dietsToCreate.join(', ')}`);
+          } catch (err) {
+            console.error('⚠️ Failed to create Diet nodes (non-blocking):', err);
+            // Don't block onboarding if diet creation fails
+          }
+        }
+      }
+      
       await loadUserAllergies(currentUserId);
       await loadUserFavoriteCuisines(currentUserId);
       
+      // IMPORTANT: Wait for state to update after loading favorite cuisines
+      // This ensures FoodSuggestions component will have favoriteCuisines in context
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Reload user profile to get updated completed_onboarding status (for both registered and guest users)
       await loadUserProfile(currentUserId);
+      
+      // Wait again for user profile state to update
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Ensure userId is saved (important for guest users)
       if (currentUserId) {
@@ -836,6 +862,12 @@ const Onboarding: React.FC = () => {
         setUserId(currentUserId, isGuest);
         console.log('✅ Saved userId:', currentUserId, isGuest ? '(sessionStorage)' : '(localStorage)');
       }
+      
+      // IMPORTANT: Verify favorite cuisines are loaded before navigating
+      // Reload one more time to ensure state is fresh
+      await loadUserFavoriteCuisines(currentUserId);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      console.log('✅ Favorite cuisines loaded before navigation:', favoriteCuisines);
       
       // Set guestCompletedOnboarding flag for guest users (to prevent redirect back to onboarding)
       if (isGuest) {
@@ -978,7 +1010,7 @@ const Onboarding: React.FC = () => {
                             {option.name}
                             {ageGroup === option.id && (
                               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#85DCB0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             )}
                           </div>
@@ -1031,7 +1063,7 @@ const Onboarding: React.FC = () => {
                             {option.name}
                             {gender === option.id && (
                               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#85DCB0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             )}
                           </div>
@@ -1094,7 +1126,7 @@ const Onboarding: React.FC = () => {
                           >
                             {isSelected && (
                               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="allergy-checkmark">
-                                <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#85DCB0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             )}
                             <span className={isSelected ? 'selected-text' : ''}>{ingredient.name}</span>
@@ -1136,9 +1168,9 @@ const Onboarding: React.FC = () => {
             </div>
           )}
 
-          {/* Dietary Mode Section */}
+          {/* Dietary Mode Section - HIDDEN */}
           {/* Show if user hasn't completed onboarding before (guest or first-time login) */}
-          {!hasCompletedOnboardingBefore && (
+          {false && !hasCompletedOnboardingBefore && (
             <div className="onboarding-section">
               <div className="section-header">
                 <h2>{sections[2].title}</h2>

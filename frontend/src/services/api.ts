@@ -61,6 +61,11 @@ class ApiService {
     }
 
     try {
+      console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`, {
+        headers: defaultHeaders,
+        hasBody: !!options.body
+      });
+      
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -69,28 +74,69 @@ class ApiService {
         },
       });
 
+      console.log(`📡 API Response: ${response.status} ${response.statusText}`, {
+        ok: response.ok,
+        contentType: response.headers.get('content-type')
+      });
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new ApiError(
-          response.status, 
-          errorData.detail || `HTTP error! status: ${response.status}`
-        );
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+          console.error('❌ API Error Response:', errorData);
+        } catch (e) {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            if (errorText) {
+              errorMessage = errorText;
+            }
+          } catch (e2) {
+            // Ignore if can't read text either
+          }
+        }
+        throw new ApiError(response.status, errorMessage);
       }
 
       const data = await response.json();
+      // Log raw response for debugging (only for /recommend endpoint)
+      if (endpoint.includes('/recommend')) {
+        console.log('📥 API: Raw response data:', data);
+        console.log('📥 API: Response data type:', typeof data);
+        console.log('📥 API: Response data keys:', Object.keys(data || {}));
+        if (data && data.results) {
+          console.log('📥 API: Results found in response:', {
+            results_type: typeof data.results,
+            results_is_array: Array.isArray(data.results),
+            results_length: data.results.length,
+            first_result: data.results[0]
+          });
+        } else {
+          console.warn('⚠️ API: No results found in response data:', data);
+        }
+      }
       return { data };
     } catch (error) {
       if (error instanceof ApiError) {
+        console.error('❌ API Error (thrown):', {
+          status: error.status,
+          message: error.message
+        });
         throw error;
       }
       // Handle network errors (CORS, connection refused, etc.)
       if (error instanceof TypeError && error.message.includes('fetch')) {
+        const networkError = 'Network error: Could not connect to server. Please check if the backend is running on http://localhost:8000';
+        console.error('❌ Network Error:', networkError);
         return { 
-          error: 'Network error: Could not connect to server. Please check if the backend is running on http://localhost:8000' 
+          error: networkError
         };
       }
+      const unknownError = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('❌ Unknown Error:', unknownError, error);
       return { 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+        error: unknownError
       };
     }
   }
@@ -139,10 +185,23 @@ class ApiService {
 
   // Recommendations
   async getRecommendations(request: RecommendationRequest): Promise<ApiResponse<RecommendationResponse>> {
-    return this.request<RecommendationResponse>('/recommend', {
+    console.log('🔍 API: Calling /recommend endpoint with request:', request);
+    // Log the serialized JSON to see what will actually be sent
+    const requestBody = JSON.stringify(request);
+    console.log('📤 API: Serialized request body:', requestBody);
+    console.log('📤 API: preferred_cuisines in request:', request.preferred_cuisines);
+    console.log('📤 API: preferred_cuisines type:', typeof request.preferred_cuisines);
+    console.log('📤 API: preferred_cuisines is array:', Array.isArray(request.preferred_cuisines));
+    if (request.preferred_cuisines) {
+      console.log('📤 API: preferred_cuisines length:', request.preferred_cuisines.length);
+      console.log('📤 API: preferred_cuisines values:', request.preferred_cuisines);
+    }
+    const result = await this.request<RecommendationResponse>(API_ENDPOINTS.RECOMMEND, {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: requestBody,
     });
+    console.log('📥 API: Response received:', result);
+    return result;
   }
 
   async getRecommendationsGet(
@@ -462,6 +521,7 @@ class ApiService {
       }
     );
   }
+
 }
 
 export const apiService = new ApiService();

@@ -79,17 +79,17 @@
 }
 
 .btn-like-overlay.liked {
-  color: #ef4444;
+  color: var(--color-primary);
 }
 
 .btn-like-overlay.liked:hover {
-  color: #dc2626;
+  color: var(--color-primary-dark);
 }
 
 .food-detail .recipe-title {
   font-size: 3rem;
   font-weight: var(--font-bold);
-  color: #1a472a;
+  color: var(--color-secondary);
   margin: 0;
   
   line-height: 1.2;
@@ -112,7 +112,7 @@
 
 .recipe-url-link {
   font-size: 13px;
-  color: #666;
+  color: var(--text-secondary);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -121,7 +121,7 @@
 }
 
 .recipe-url-link:hover {
-  color: #ff8c42;
+  color: var(--color-primary);
 }
 
 .recipe-metadata {
@@ -155,17 +155,17 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  color: #fbbf24;
+  color: var(--color-warning);
   margin-left: var(--spacing-xs);
 }
 
 .stars-inline .star {
-  color: #fbbf24;
+  color: var(--color-warning);
 }
 
 .stars-inline .star.filled {
-  fill: #fbbf24;
-  color: #fbbf24;
+  fill: var(--color-warning);
+  color: var(--color-warning);
 }
 
 .time-metadata,
@@ -183,7 +183,7 @@
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
-  background-color: #f8f9fa;
+  background-color: var(--bg-secondary);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
 }
@@ -194,11 +194,11 @@
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
-  background: linear-gradient(135deg, #fff9f0 0%, #fff5e6 100%);
+  background: linear-gradient(135deg, rgba(232, 168, 124, 0.1) 0%, rgba(226, 125, 96, 0.1) 100%);
   border-radius: var(--radius-lg);
-  border: 2px solid #fbbf24;
+  border: 2px solid var(--color-warning);
   margin-top: var(--spacing-md);
-  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.15);
+  box-shadow: 0 2px 8px rgba(232, 168, 124, 0.15);
 }
 
 .rate-prompt-inline {
@@ -214,18 +214,18 @@
 }
 
 .interactive-stars-inline .star {
-  color: #d1d5db;
+  color: var(--border-medium);
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .interactive-stars-inline .star.filled {
-  color: #fbbf24;
-  fill: #fbbf24;
+  color: var(--color-warning);
+  fill: var(--color-warning);
 }
 
 .interactive-stars-inline .star:hover {
-  color: #fbbf24;
+  color: var(--color-warning);
   transform: scale(1.15);
 }
 
@@ -235,14 +235,14 @@
 
 .rating-hint {
   font-size: 12px;
-  color: #999;
+  color: var(--text-disabled);
   font-style: italic;
   margin-left: auto;
 }
 
 .btn-submit-rating-small {
   padding: 6px 16px;
-  background-color: #f97316;
+  background-color: var(--color-primary);
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -253,9 +253,9 @@
 }
 
 .btn-submit-rating-small:hover {
-  background-color: #ea580c;
+  background-color: var(--color-primary-dark);
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(249, 115, 22, 0.3);
+  box-shadow: 0 2px 6px rgba(226, 125, 96, 0.3);
 }
 
 .btn-submit-rating-small:active {
@@ -300,16 +300,16 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  color: #fbbf24;
+  color: var(--color-warning);
 }
 
 .stars-display-large .star {
-  color: #fbbf24;
+  color: var(--color-warning);
 }
 
 .stars-display-large .star.filled {
-  fill: #fbbf24;
-  color: #fbbf24;
+  fill: var(--color-warning);
+  color: var(--color-warning);
 }
 
 .rating-large-count {
@@ -337,23 +337,23 @@
 }
 
 .interactive-stars .star {
-  color: #d1d5db;
+  color: var(--border-medium);
   transition: color 0.2s ease;
   cursor: pointer;
 }
 
 .interactive-stars .star.filled {
-  color: #fbbf24;
-  fill: #fbbf24;
+  color: var(--color-warning);
+  fill: var(--color-warning);
 }
 
 .interactive-stars .star:hover {
-  color: #fbbf24;
+  color: var(--color-warning);
 }
 
 .btn-submit-rating {
   padding: var(--spacing-sm) var(--spacing-xl);
-  background-color: #f97316;
+  background-color: var(--color-primary);
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -365,7 +365,7 @@
 }
 
 .btn-submit-rating:hover:not(:disabled) {
-  background-color: #ea580c;
+  background-color: var(--color-primary-dark);
 }
 
 .btn-submit-rating:disabled {
@@ -415,7 +415,7 @@
   grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-md);
   padding: var(--spacing-md);
-  background-color: #f9f9f9;
+  background-color: var(--bg-secondary);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
 }
@@ -444,7 +444,7 @@
 .nutrition-toggle-button {
   background: none;
   border: none;
-  color: #ff8c42;
+  color: var(--color-primary);
   text-decoration: underline;
   font-size: 14px;
   cursor: pointer;
@@ -454,7 +454,7 @@
 }
 
 .nutrition-toggle-button:hover {
-  color: #ff6b35;
+  color: var(--color-primary-dark);
 }
 
 .nutrition-toggle-hide {
@@ -529,7 +529,7 @@
 
 .nutrition-footnote {
   font-size: 11px;
-  color: #666;
+  color: var(--text-secondary);
   line-height: 1.4;
   margin-top: var(--spacing-md);
   padding-top: var(--spacing-sm);
@@ -571,17 +571,17 @@
 .ingredient-checkbox {
   width: 20px;
   height: 20px;
-  border: 2px solid #ccc;
+  border: 2px solid var(--border-medium);
   border-radius: 4px;
   flex-shrink: 0;
-  background-color: #fff;
+  background-color: var(--bg-primary);
   transition: all 0.2s ease;
   position: relative;
 }
 
 .ingredient-checkbox.selected {
-  background-color: #f97316;
-  border-color: #f97316;
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .ingredient-checkbox.selected::after {
@@ -641,7 +641,7 @@
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  background-color: #f97316;
+  background-color: var(--color-primary);
   color: white;
   border-radius: var(--radius-full);
   display: flex;
@@ -672,21 +672,21 @@
   justify-content: center;
   gap: 6px;
   padding: 10px 20px;
-  background: linear-gradient(135deg, #ff8c42 0%, #ff6b35 100%);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
   color: white;
   text-decoration: none;
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(255, 140, 66, 0.25);
+  box-shadow: 0 2px 6px rgba(226, 125, 96, 0.25);
   border: none;
   cursor: pointer;
 }
 
 .recipe-link-button:hover {
-  background: linear-gradient(135deg, #ff6b35 0%, #ff5722 100%);
-  box-shadow: 0 3px 10px rgba(255, 140, 66, 0.35);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  box-shadow: 0 3px 10px rgba(226, 125, 96, 0.35);
   transform: translateY(-1px);
 }
 

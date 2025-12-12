@@ -337,23 +337,12 @@ const Profile: React.FC = () => {
       // Try to get stats from stats endpoint first
       const statsRes = await apiService.getUserInteractionStats(userId);
       if (statsRes.data && statsRes.data.stats) {
-        // Get rated count from interactions
-        try {
-          const interactionsRes = await apiService.getUserInteractions(userId, undefined, 1000, 0);
-          const rated = interactionsRes.data?.interactions?.filter((i: any) => i.rating && i.rating > 0).length || 0;
-          
-          setActivityStats({
-            likedRecipes: statsRes.data.stats.like_count || 0,
-            viewedRecipes: statsRes.data.stats.view_count || 0,
-            ratedRecipes: rated
-          });
-        } catch (err) {
-          setActivityStats({
-            likedRecipes: statsRes.data.stats.like_count || 0,
-            viewedRecipes: statsRes.data.stats.view_count || 0,
-            ratedRecipes: 0
-          });
-        }
+        // Use rating_count directly from stats endpoint
+        setActivityStats({
+          likedRecipes: statsRes.data.stats.like_count || 0,
+          viewedRecipes: statsRes.data.stats.view_count || 0,
+          ratedRecipes: statsRes.data.stats.rating_count || 0
+        });
         return;
       }
     } catch (err) {
@@ -597,6 +586,30 @@ const Profile: React.FC = () => {
       for (const cuisineName of cuisinesToRemove) {
         await apiService.removeUserFavoriteCuisine(userId, cuisineName);
       }
+
+      // Update diets (create Diet nodes and FOLLOWS_DIET relationships automatically)
+      // Similar to how Cuisine nodes are created automatically
+      if (editingDietaryPlan && editingDietaryPlan !== 'none' && editingDietaryPlan !== 'bmi_based') {
+        // For explicit dietary modes (low_carb, high_protein, low_fat, keto), create Diet nodes
+        const dietsToCreate: string[] = [editingDietaryPlan];
+        
+        try {
+          await apiService.updateUserDiets(userId, { diets: dietsToCreate });
+          console.log(`✅ Created Diet nodes: ${dietsToCreate.join(', ')}`);
+        } catch (err) {
+          console.error('⚠️ Failed to create Diet nodes (non-blocking):', err);
+          // Don't block profile update if diet creation fails
+        }
+      } else if (editingDietaryPlan === 'none' || (!editingDietaryPlan && user?.dietary_plan)) {
+        // If user selects "none" or clears dietary plan, remove all Diet relationships
+        try {
+          await apiService.updateUserDiets(userId, { diets: [] });
+          console.log('✅ Removed all Diet relationships');
+        } catch (err) {
+          console.error('⚠️ Failed to remove Diet relationships (non-blocking):', err);
+        }
+      }
+      // Note: For BMI-based, don't create Diet nodes (dietary_plan is set in profile instead)
 
       // Reload data
       await loadUserData();
@@ -858,57 +871,6 @@ const Profile: React.FC = () => {
                     )}
                   </div>
                 </div>
-
-                <div className="preference-group" style={{ marginBottom: '0' }}>
-                  <h3 className="preference-label">Dietary Plan</h3>
-                  <div className="tags-container">
-                    {(() => {
-                      // Debug logging
-                      console.log('🔍 Dietary Plan Display:', {
-                        dietary_plan: user?.dietary_plan,
-                        auto_dietary_plan: user?.auto_dietary_plan,
-                        bmi: user?.bmi
-                      });
-                      
-                      if (user?.dietary_plan) {
-                        return (
-                      <span className="tag tag-cuisine">
-                        {user.dietary_plan === 'low_carb' && '🥗 Low-Carb Diet'}
-                        {user.dietary_plan === 'high_protein' && '🥩 High-Protein Diet'}
-                        {user.dietary_plan === 'low_fat' && '🥬 Low-Fat Diet'}
-                        {user.dietary_plan === 'keto' && '🥑 Ketogenic Diet'}
-                        {user.dietary_plan === 'weight_gain' && '📈 Weight Gain'}
-                        {user.dietary_plan === 'weight_loss' && '📉 Weight Loss'}
-                        {!['low_carb', 'high_protein', 'low_fat', 'keto', 'weight_gain', 'weight_loss'].includes(user.dietary_plan) && user.dietary_plan}
-                      </span>
-                        );
-                      } else if (user?.auto_dietary_plan && user?.bmi) {
-                        return (
-                      <span className="tag tag-cuisine">
-                        {user.bmi < 18.5 && '📈 Weight Gain (Auto from BMI)'}
-                        {user.bmi >= 18.5 && user.bmi <= 24.9 && '⚖️ Balanced (Auto from BMI)'}
-                        {user.bmi > 24.9 && '📉 Weight Loss (Auto from BMI)'}
-                      </span>
-                        );
-                      } else {
-                        return <span className="empty-tag">No dietary plan selected</span>;
-                      }
-                    })()}
-                  </div>
-                  {user?.bmi && (
-                    <div style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--text-sm)', color: '#666' }}>
-                      BMI: {user.bmi.toFixed(1)}
-                      {user.weight_kg && user.height_cm && (
-                        <span> ({user.weight_kg}kg / {user.height_cm}cm)</span>
-                      )}
-                    </div>
-                  )}
-                  {user?.activity_level && (
-                    <div style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--text-sm)', color: '#666' }}>
-                      Activity Level: {activityLevelOptions.find(a => a.id === user.activity_level)?.name || user.activity_level}
-                    </div>
-                  )}
-                </div>
               </div>
               
               {/* Edit Modal */}
@@ -1039,7 +1001,7 @@ const Profile: React.FC = () => {
                                           {option.name}
                                           {editingGender === option.id && (
                                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                              <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                              <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#85DCB0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                             </svg>
                                           )}
                                         </div>
@@ -1155,7 +1117,7 @@ const Profile: React.FC = () => {
                                   >
                                     {isSelected && (
                                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="allergy-checkmark">
-                                        <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#85DCB0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                       </svg>
                                     )}
                                     <span className={isSelected ? 'selected-text' : ''}>{ingredient.name}</span>
@@ -1211,203 +1173,6 @@ const Profile: React.FC = () => {
                             );
                           })}
                         </div>
-                      </div>
-
-                      {/* Dietary Plan Section */}
-                      <div className="edit-section" style={{ marginBottom: '0', marginTop: '-35px' }}>
-                        <h3>Dietary Plan</h3>
-                        <div className="edit-form-field">
-                          <div className="custom-dropdown" ref={dietaryModeDropdownRef}>
-                            <div 
-                              className="custom-dropdown-select"
-                              onClick={() => setIsDietaryModeDropdownOpen(!isDietaryModeDropdownOpen)}
-                            >
-                              <span className={`custom-dropdown-value ${!editingDietaryPlan || editingDietaryPlan === 'none' ? 'placeholder' : ''}`}>
-                                {editingDietaryPlan && editingDietaryPlan !== 'none'
-                                  ? dietaryModeOptions.find(d => d.id === editingDietaryPlan)?.name || 'Select dietary mode...'
-                                  : 'Select dietary mode...'}
-                              </span>
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="custom-dropdown-arrow">
-                                <path d="M2 4L6 8L10 4" stroke="#9e9e9e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                              </svg>
-                        </div>
-                            {isDietaryModeDropdownOpen && (
-                              <div className="custom-dropdown-list">
-                                {dietaryModeOptions.map(option => (
-                                  <div
-                                    key={option.id}
-                                    className={`custom-dropdown-item ${editingDietaryPlan === option.id ? 'selected' : ''}`}
-                                    onClick={() => {
-                                      setEditingDietaryPlan(option.id);
-                                      setIsDietaryModeDropdownOpen(false);
-                                      // Reset BMI fields if not BMI-based
-                                      if (option.id !== 'bmi_based') {
-                                        setEditingWeightKg('');
-                                        setEditingHeightCm('');
-                                      }
-                                    }}
-                                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                      <span style={{ fontWeight: '500' }}>{option.name}</span>
-                                      {editingDietaryPlan === option.id && (
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                          <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                      )}
-                                    </div>
-                                    {option.description && (
-                                      <span style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                                        {option.description}
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* BMI Form - Show when BMI-based is selected */}
-                        {editingDietaryPlan === 'bmi_based' && (
-                          <div style={{ marginTop: 'var(--spacing-md)', padding: 'var(--spacing-md)', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                            <p style={{ marginBottom: 'var(--spacing-md)', fontSize: '14px', color: '#666' }}>
-                              We'll automatically determine your dietary plan based on your BMI:
-                              <br />• BMI &lt; 18.5: Weight Gain (High-Protein + High-Calorie)
-                              <br />• BMI 18.5-24.9: Balanced Diet (No restrictions)
-                              <br />• BMI &gt; 24.9: Weight Loss (Low-Carb + High-Protein + Low-Fat)
-                            </p>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)' }}>
-                              <div className="edit-form-field">
-                                <label htmlFor="edit-height">Height (cm) *</label>
-                            <input
-                                  id="edit-height"
-                                  type="number"
-                                  placeholder="Enter height in cm"
-                                  min="50"
-                                  max="300"
-                                  step="0.1"
-                                  value={editingHeightCm}
-                                  onChange={(e) => setEditingHeightCm(e.target.value === '' ? '' : Number(e.target.value))}
-                                  className="edit-form-input"
-                                />
-                        </div>
-                          <div className="edit-form-field">
-                                <label htmlFor="edit-weight">Weight (kg) *</label>
-                            <input
-                              id="edit-weight"
-                              type="number"
-                                  placeholder="Enter weight in kg"
-                              min="1"
-                              max="500"
-                              step="0.1"
-                              value={editingWeightKg}
-                              onChange={(e) => setEditingWeightKg(e.target.value === '' ? '' : Number(e.target.value))}
-                              className="edit-form-input"
-                            />
-                          </div>
-                          </div>
-                            
-                            {/* Activity Level */}
-                            <div className="edit-form-field" style={{ marginTop: 'var(--spacing-md)' }}>
-                              <label htmlFor="edit-activity-level">Activity Level</label>
-                              <div className="custom-dropdown" ref={activityLevelDropdownRef}>
-                                <div 
-                                  className="custom-dropdown-select"
-                                  onClick={() => setIsActivityLevelDropdownOpen(!isActivityLevelDropdownOpen)}
-                                >
-                                  <span className={`custom-dropdown-value ${!editingActivityLevel ? 'placeholder' : ''}`}>
-                                    {editingActivityLevel 
-                                      ? activityLevelOptions.find(a => a.id === editingActivityLevel)?.name || 'Select activity level...'
-                                      : 'Select activity level...'}
-                                  </span>
-                                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="custom-dropdown-arrow">
-                                    <path d="M2 4L6 8L10 4" stroke="#9e9e9e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                                  </svg>
-                                </div>
-                                {isActivityLevelDropdownOpen && (
-                                  <div className="custom-dropdown-list">
-                                    {activityLevelOptions.map(option => (
-                                      <div
-                                        key={option.id}
-                                        className={`custom-dropdown-item ${editingActivityLevel === option.id ? 'selected' : ''}`}
-                                        onClick={() => {
-                                          setEditingActivityLevel(option.id);
-                                          setIsActivityLevelDropdownOpen(false);
-                                        }}
-                                      >
-                                        {option.name}
-                                        {editingActivityLevel === option.id && (
-                                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                          </svg>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* Display calculated BMI and dietary plan */}
-                            {editingHeightCm && editingWeightKg && 
-                             typeof editingHeightCm === 'number' && editingHeightCm > 0 && 
-                             typeof editingWeightKg === 'number' && editingWeightKg > 0 && (
-                              <div style={{ 
-                                marginTop: 'var(--spacing-md)',
-                                padding: '12px', 
-                                backgroundColor: '#e8f5e9', 
-                                borderRadius: '6px',
-                                border: '1px solid #4caf50'
-                              }}>
-                                {(() => {
-                                  const heightCm = typeof editingHeightCm === 'number' ? editingHeightCm : parseFloat(String(editingHeightCm));
-                                  const weightKg = typeof editingWeightKg === 'number' ? editingWeightKg : parseFloat(String(editingWeightKg));
-                                  const heightM = heightCm / 100.0;
-                                  const calculatedBMI = weightKg / (heightM * heightM);
-                                  let bmiStatus = '';
-                                  let planName = '';
-                                  let planColor = '#4caf50';
-                                  
-                                  if (calculatedBMI < 18.5) {
-                                    bmiStatus = 'Underweight';
-                                    planName = 'Weight Gain Plan';
-                                    planColor = '#ff9800';
-                                  } else if (calculatedBMI > 24.9) {
-                                    bmiStatus = 'Overweight';
-                                    planName = 'Weight Loss Plan';
-                                    planColor = '#f44336';
-                                  } else {
-                                    bmiStatus = 'Normal';
-                                    planName = 'Balanced Diet';
-                                    planColor = '#4caf50';
-                                  }
-                                  
-                                  return (
-                                    <div>
-                                      <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
-                                        BMI: <span style={{ color: planColor }}>{calculatedBMI.toFixed(1)}</span> ({bmiStatus})
-                        </div>
-                                      <div style={{ fontSize: '14px', color: '#666' }}>
-                                        Recommended: <strong style={{ color: planColor }}>{planName}</strong>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Show current BMI if exists and not editing BMI-based */}
-                        {user?.bmi && editingDietaryPlan !== 'bmi_based' && (
-                          <div style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--text-sm)', color: '#666' }}>
-                            Current BMI: {user.bmi.toFixed(1)}
-                            {user.bmi < 18.5 && ' (Underweight - Weight Gain recommended)'}
-                            {user.bmi >= 18.5 && user.bmi <= 24.9 && ' (Normal - Balanced diet)'}
-                            {user.bmi > 24.9 && ' (Overweight - Weight Loss recommended)'}
-                          </div>
-                        )}
                       </div>
                         </div>
                       </div>

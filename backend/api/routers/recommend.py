@@ -1,10 +1,82 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 from ..services.recommender import recommend as rec_impl
-
+import sys
+import math
+from pathlib import Path
 
 router = APIRouter(prefix="/recommend", tags=["Recommend"])
+
+
+def sanitize_json_float(obj: Any) -> Any:
+    """
+    Recursively sanitize float values in dictionaries/lists to replace
+    inf, -inf, and nan with None (which is JSON-compliant).
+    
+    This prevents "ValueError: Out of range float values are not JSON compliant"
+    errors when serializing FastAPI responses.
+    
+    Also handles numpy float types that might be returned from Neo4j queries.
+    """
+    if isinstance(obj, dict):
+        return {key: sanitize_json_float(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_json_float(item) for item in obj]
+    elif isinstance(obj, float) or (hasattr(obj, '__float__') and not isinstance(obj, (int, bool, str))):
+        try:
+            # Convert to Python float (handles numpy types)
+            float_val = float(obj)
+            if math.isnan(float_val) or math.isinf(float_val):
+                return None
+            return float_val
+        except (ValueError, TypeError, OverflowError):
+            # If conversion fails, return as-is (will likely fail JSON serialization anyway)
+            return obj
+    return obj
+
+
+@router.get("/test-import", summary="Test GraphHybridRecommender import status")
+async def test_import():
+    """
+    Test endpoint to check if GraphHybridRecommender can be imported.
+    Useful for debugging why fallback query is being used.
+    """
+    from ..services import recommender as recommender_module
+    
+    backend_dir = Path(__file__).parent.parent.parent
+    result = {
+        "backend_dir": str(backend_dir),
+        "scripts_path": str(backend_dir / "scripts"),
+        "recommend_graph_exists": (backend_dir / "scripts" / "recommend_graph.py").exists(),
+        "import_success": False,
+        "import_error": None,
+        "class_available": False
+    }
+    
+    # Check module-level import status
+    if hasattr(recommender_module, '_import_error'):
+        result["module_import_error"] = recommender_module._import_error
+    
+    if hasattr(recommender_module, '_recommender_class'):
+        result["class_available"] = recommender_module._recommender_class is not None
+        result["import_success"] = recommender_module._recommender_class is not None
+    
+    # Try to import directly
+    try:
+        if str(backend_dir) not in sys.path:
+            sys.path.insert(0, str(backend_dir))
+        
+        from scripts.recommend_graph import GraphHybridRecommender
+        result["import_success"] = True
+        result["class_available"] = GraphHybridRecommender is not None
+        result["class_name"] = GraphHybridRecommender.__name__ if GraphHybridRecommender else None
+    except Exception as e:
+        result["import_error"] = str(e)
+        import traceback
+        result["traceback"] = traceback.format_exc()
+    
+    return result
 
 
 class RecommendRequest(BaseModel):
@@ -42,15 +114,16 @@ async def post_recommend(req: RecommendRequest):
                 normalized_preferred_cuisines = None  # No preference
         
         # Log request for debugging
-        print(f"🔍 Recommendation request received:")
-        print(f"  - user_id: {req.user_id}")
-        print(f"  - ingredient_ids: {req.ingredient_ids} (count: {len(req.ingredient_ids) if req.ingredient_ids else 0})")
-        print(f"  - ingredient_names: {req.ingredient_names} (count: {len(req.ingredient_names) if req.ingredient_names else 0})")
-        print(f"  - max_cook_time: {req.max_cook_time}")
-        print(f"  - limit: {req.limit}")
-        print(f"  - min_match_ratio: {req.min_match_ratio}")
-        print(f"  - preferred_cuisines (original): {req.preferred_cuisines}")
-        print(f"  - preferred_cuisines (normalized): {normalized_preferred_cuisines}")
+        print(f"🔍 Recommendation request received:", flush=True)
+        print(f"  - user_id: {req.user_id}", flush=True)
+        print(f"  - ingredient_ids: {req.ingredient_ids} (count: {len(req.ingredient_ids) if req.ingredient_ids else 0})", flush=True)
+        print(f"  - ingredient_names: {req.ingredient_names} (count: {len(req.ingredient_names) if req.ingredient_names else 0})", flush=True)
+        print(f"  - max_cook_time: {req.max_cook_time}", flush=True)
+        print(f"  - limit: {req.limit}", flush=True)
+        print(f"  - min_match_ratio: {req.min_match_ratio}", flush=True)
+        print(f"  - preferred_cuisines (original): {req.preferred_cuisines}", flush=True)
+        print(f"  - preferred_cuisines (normalized): {normalized_preferred_cuisines}", flush=True)
+        print(f"  - recipe_category: {req.recipe_category}", flush=True)
         
         results = rec_impl(
             user_id=req.user_id,
@@ -63,8 +136,29 @@ async def post_recommend(req: RecommendRequest):
             min_match_ratio=req.min_match_ratio
         )
         
-        print(f"✅ Recommendation results: {len(results)} recipes found")
-        return {"results": results, "total": len(results)}
+        print(f"✅ Recommendation results: {len(results)} recipes found", flush=True)
+        if not results or len(results) == 0:
+            print(f"⚠️ No recipes found - returning empty array", flush=True)
+        else:
+            # Log first few recipe titles to see what we're returning
+            first_few = results[:3] if len(results) >= 3 else results
+            titles = [r.get('title', 'N/A') for r in first_few]
+            match_percents = [r.get('match_percent', 'N/A') for r in first_few]
+            print(f"📋 First {len(titles)} recipes: {titles}", flush=True)
+            print(f"📊 Match percents: {match_percents}", flush=True)
+            # Log full details of first recipe for debugging
+            if len(results) > 0:
+                first_recipe = results[0]
+                print(f"🔍 First recipe details:", flush=True)
+                print(f"  - recipe_id: {first_recipe.get('recipe_id')}", flush=True)
+                print(f"  - title: {first_recipe.get('title')}", flush=True)
+                print(f"  - match_percent: {first_recipe.get('match_percent')}", flush=True)
+                print(f"  - cuisine: {first_recipe.get('cuisine')}", flush=True)
+                print(f"  - matched_ing: {first_recipe.get('matched_ing', [])}", flush=True)
+                print(f"  - missing_ing: {first_recipe.get('missing_ing', [])}", flush=True)
+        # Sanitize results to remove inf/nan float values before JSON serialization
+        sanitized_results = sanitize_json_float(results or [])
+        return {"results": sanitized_results, "total": len(sanitized_results)}
     except Exception as e:
         print(f"❌ Recommendation error: {str(e)}")
         import traceback
@@ -109,4 +203,6 @@ async def get_recommend(
         preferred_cuisines=normalized_preferred_cuisines,
         min_match_ratio=min_match_ratio
     )
-    return {"results": results, "total": len(results)}
+    # Sanitize results to remove inf/nan float values before JSON serialization
+    sanitized_results = sanitize_json_float(results)
+    return {"results": sanitized_results, "total": len(sanitized_results)}

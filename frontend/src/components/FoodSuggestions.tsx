@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Star, Users, Heart } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
-import { apiService } from '../services/api';
+import { apiService, ApiError } from '../services/api';
 import { RecipeRecommendation, RecommendationRequest } from '../types/api';
 import { FoodSuggestion } from '../types';
 import { getUserId, setUserId } from '../utils/auth';
@@ -379,8 +379,8 @@ const FoodSuggestions: React.FC = () => {
         } else {
           console.log('✅ User profile loaded successfully');
         }
-        // Wait a bit for state to update
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Don't wait - React state updates are handled asynchronously
+        // The backend will handle user_id correctly even if context hasn't updated yet
       }
       
       // Ensure favorite cuisines are loaded before making recommendation request
@@ -389,9 +389,11 @@ const FoodSuggestions: React.FC = () => {
       console.log('🔍 loadRecommendations - Final userId:', finalUserId);
       if (!favoriteCuisines) {
         console.log('🔄 Favorite cuisines not loaded yet, loading now...');
-        await loadUserFavoriteCuisines(userId);
-        // Wait a bit for state to update (React state update is async)
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Load in parallel - don't wait for state update
+        loadUserFavoriteCuisines(userId).catch(err => {
+          console.warn('Failed to load favorite cuisines:', err);
+        });
+        // Don't wait - backend can work without favorite cuisines in context
       }
       
       const ingredientIds = selectedIngredients.filter(id => id && !id.startsWith('custom-'));
@@ -432,31 +434,27 @@ const FoodSuggestions: React.FC = () => {
         .filter(name => name.length > 0);
 
       // Get meal type from user preferences (stored in meal_preferences)
-      // Use user from context if available, otherwise use userId directly (backend will handle it)
-      const mealType = user?.meal_preferences && user.meal_preferences.length > 0 
-        ? user.meal_preferences[0] 
-        : undefined;
-
-      // Get preferred cuisines for sorting (not for filtering)
-      const preferredCuisinesList = favoriteCuisines?.favorite_cuisines 
-        ? favoriteCuisines.favorite_cuisines.map((c: any) => c.cuisine_name)
-        : [];
+      // NOTE: Don't send recipe_category if format might not match database
+      // Backend will handle meal preferences via user_id if needed
+      // const mealType = user?.meal_preferences && user.meal_preferences.length > 0 
+      //   ? user.meal_preferences[0] 
+      //   : undefined;
 
       // Get allergies (for logging - backend will handle exclusion automatically via user_id)
       const userAllergies = allergies?.allergies 
         ? allergies.allergies.map((a: any) => a.ingredient_name || a.ingredient_id)
         : [];
 
-      // Request more results to have enough for pagination
-      // We'll fetch 100 results, then sort and paginate on frontend
+      // Request a reasonable number of results (backend scoring is quite heavy)
+      // Fetch fewer items to keep response time fast, then paginate on frontend
       const request: RecommendationRequest = {
         user_id: finalUserId,
         ingredient_ids: ingredientIds.length > 0 ? ingredientIds : undefined,
         ingredient_names: ingredientNames.length > 0 ? ingredientNames : undefined,
         max_cook_time: user?.max_cook_time,
-        recipe_category: mealType,  // Use meal type from user preferences
+        recipe_category: undefined,  // Don't send recipe_category - let backend handle via user_id
         preferred_cuisines: undefined, // Không giới hạn cuisine - lấy tất cả
-        limit: 100, // Fetch more to have enough for pagination
+        limit: 50, // OPTIMIZED: Reduced from 100 to 50 for faster response (can paginate if needed)
         min_match_ratio: 0.3
       };
 
@@ -480,72 +478,58 @@ const FoodSuggestions: React.FC = () => {
       
       console.log('📥 Recommendation Response:', {
         has_data: !!response.data,
+        has_error: !!response.error,
+        data_keys: response.data ? Object.keys(response.data) : [],
+        results_type: typeof response.data?.results,
+        results_is_array: Array.isArray(response.data?.results),
         results_count: response.data?.results?.length || 0,
         total: response.data?.total || 0,
-        error: response.error
+        error: response.error,
+        full_response: response
       });
       
+      // Check for error first
+      if (response.error) {
+        console.error('❌ API Error:', response.error);
+        setError(`API Error: ${response.error}. Please check if the backend is running.`);
+        // Don't load mock suggestions on real errors
+        return;
+      }
+      
       if (response.data) {
-        if (response.data.results.length === 0) {
-          console.warn('No recommendations returned for request', request);
+        // Safely check if results exist and is an array
+        const results = response.data.results;
+        if (!results || !Array.isArray(results) || results.length === 0) {
+          console.warn('⚠️ No recommendations returned for request', {
+            request,
+            results,
+            results_type: typeof results,
+            results_is_array: Array.isArray(results),
+            results_length: results?.length,
+            total: response.data?.total
+          });
           setError('No recipes found matching your ingredients. Try different ingredients or adjust your preferences.');
-          loadMockSuggestions();
+          // Only load mock suggestions if user explicitly wants fallback
+          // loadMockSuggestions();
         } else {
+          // OPTIMIZED: Pre-compute cuisine display helper to avoid repeated operations
+          const formatCuisine = (cuisine: string | string[] | undefined): string => {
+            if (!cuisine) return 'World';
+            if (Array.isArray(cuisine)) {
+              return cuisine.length > 0 ? cuisine.join(', ') : 'World';
+            }
+            // For string, just return as-is (backend should return proper format)
+            // Don't do expensive splitting - backend handles this correctly
+            return cuisine || 'World';
+          };
+          
           const convertedSuggestions = response.data.results.map((recipe: RecipeRecommendation) => {
             const rawScore = typeof recipe.score === 'number'
               ? recipe.score
               : (recipe as RecipeRecommendation & { match_percent?: number }).match_percent ?? 0;
 
-            // Handle cuisine: backend returns array, frontend expects string
-            // Join all cuisines with ", " for display (e.g., "Thai, Vietnamese")
-            let cuisineDisplay: string;
-            if (Array.isArray(recipe.cuisine)) {
-              if (recipe.cuisine.length > 0) {
-                // Join all cuisines with ", " (e.g., ["Thai", "Vietnamese"] -> "Thai, Vietnamese")
-                cuisineDisplay = recipe.cuisine.join(', ');
-              } else {
-                cuisineDisplay = 'World';
-              }
-            } else if (typeof recipe.cuisine === 'string') {
-              // Handle case where cuisine might be a concatenated string like "ThaiVietnamese"
-              // Try to split common cuisine names if they're concatenated
-              const cuisineStr = recipe.cuisine;
-              // Check if it looks like concatenated cuisines (e.g., "ThaiVietnamese", "ChineseJapanese")
-              // Common cuisine names that might be concatenated (sorted by length desc to match longer names first)
-              const commonCuisines = ['Middle Eastern', 'Mediterranean', 'Vietnamese', 'Caribbean', 'European', 'American', 'British', 'Chinese', 'Japanese', 'Korean', 'Indian', 'Italian', 'Spanish', 'French', 'Mexican', 'Greek', 'Asian', 'Thai'];
-              
-              // Try to split if it matches pattern of concatenated cuisines
-              let splitCuisines: string[] = [];
-              let remaining = cuisineStr;
-              
-              // Keep trying to match cuisines until we can't match any more
-              while (remaining && remaining.length > 0) {
-                let matched = false;
-                for (const cuisine of commonCuisines) {
-                  // Case-insensitive match
-                  if (cuisine && remaining.toLowerCase().startsWith(cuisine.toLowerCase())) {
-                    splitCuisines.push(cuisine);
-                    remaining = remaining.substring(cuisine.length);
-                    matched = true;
-                    break;
-                  }
-                }
-                // If no match found, break to avoid infinite loop
-                if (!matched) {
-                  break;
-                }
-              }
-              
-              // If we successfully split into multiple cuisines and consumed entire string, use split version
-              // Otherwise, use original string (might be a single cuisine name we don't recognize)
-              if (splitCuisines.length > 1 && remaining.length === 0) {
-                cuisineDisplay = splitCuisines.join(', ');
-              } else {
-                cuisineDisplay = cuisineStr;
-              }
-            } else {
-              cuisineDisplay = 'World';
-            }
+            // OPTIMIZED: Use simple helper function instead of complex logic
+            const cuisineDisplay = formatCuisine(recipe.cuisine);
 
             // Use meal field from backend (normalized to 4 categories: Breakfast, Lunch, Dinner, Snack)
             // Fallback to 'Dinner' if not provided
@@ -573,48 +557,46 @@ const FoodSuggestions: React.FC = () => {
           };
           });
           
-          // Sort suggestions: preferred cuisines first, then others
-          const sortedSuggestions = convertedSuggestions.sort((a, b) => {
-            const aCuisines = a.cuisine.split(', ').map(c => c.trim());
-            const bCuisines = b.cuisine.split(', ').map(c => c.trim());
-            
-            // Check if suggestion has preferred cuisine
-            const aHasPreferred = aCuisines.some(c => 
-              preferredCuisinesList.some(pc => 
-                c.toLowerCase().includes(pc.toLowerCase()) || 
-                pc.toLowerCase().includes(c.toLowerCase())
-              )
-            );
-            const bHasPreferred = bCuisines.some(c => 
-              preferredCuisinesList.some(pc => 
-                c.toLowerCase().includes(pc.toLowerCase()) || 
-                pc.toLowerCase().includes(c.toLowerCase())
-              )
-            );
-            
-            // Preferred cuisines first
-            if (aHasPreferred && !bHasPreferred) return -1;
-            if (!aHasPreferred && bHasPreferred) return 1;
-            
-            // If both have or both don't have preferred, sort by match score
-            return b.matchScore - a.matchScore;
-          });
+          // Backend already sorts recommendations correctly (preferred cuisines first, then by match score)
+          // Don't re-sort here to preserve backend's ordering
+          // The backend uses GraphHybridRecommender which handles:
+          // - Preferred cuisines priority
+          // - Match ratio
+          // - Graph-based scores
+          // - Dietary plan filtering
+          // - Group preferences
           
-          // Store all suggestions
-          setAllSuggestions(sortedSuggestions);
+          // Store all suggestions (keep backend's order)
+          setAllSuggestions(convertedSuggestions);
           // Show first 20
-          const displayCount = Math.min(20, sortedSuggestions.length);
-          setSuggestions(sortedSuggestions.slice(0, displayCount));
-          setHasMore(sortedSuggestions.length > 20);
+          const displayCount = Math.min(20, convertedSuggestions.length);
+          setSuggestions(convertedSuggestions.slice(0, displayCount));
+          setHasMore(convertedSuggestions.length > 20);
+          // Clear any previous errors on success
+          setError(null);
         }
-      } else if (response.error) {
-        setError(response.error);
-        loadMockSuggestions();
+      } else {
+        // No data and no error - unexpected state
+        console.error('❌ Unexpected response state: no data and no error', response);
+        setError('Unexpected response from server. Please try again.');
       }
     } catch (err) {
-      console.error('Failed to load recommendations:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load recommendations');
-      loadMockSuggestions();
+      console.error('❌ Exception in loadRecommendations:', err);
+      if (err instanceof ApiError) {
+        const errorMsg = `API Error (${err.status}): ${err.message}`;
+        console.error('API Error details:', {
+          status: err.status,
+          message: err.message,
+          stack: err.stack
+        });
+        setError(errorMsg);
+      } else {
+        const errorMsg = err instanceof Error ? err.message : 'Failed to load recommendations';
+        console.error('Unknown error:', err);
+        setError(errorMsg);
+      }
+      // Don't load mock suggestions on errors - let user retry
+      // loadMockSuggestions();
     } finally {
       setLoading(false);
     }
@@ -1178,7 +1160,7 @@ const FoodSuggestions: React.FC = () => {
                         >
                           {isSelected && (
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="ingredient-checkmark">
-                              <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M13.3334 4L6.00002 11.3333L2.66669 8" stroke="#85DCB0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                           )}
                           <span className={isSelected ? 'selected-text' : ''}>{ingredient.name}</span>
@@ -1335,24 +1317,26 @@ const FoodSuggestions: React.FC = () => {
                   );
                 })}
               </div>
-                <div className="get-suggestions-button-container">
-                  <button
-                    className="btn btn-primary btn-lg"
-                    onClick={() => {
-                      console.log('Get Suggestions clicked', { 
-                        user_id: user?.user_id || getUserId(), 
-                        ingredients: selectedIngredients.length,
-                        loading 
-                      });
-                      loadRecommendations();
-                    }}
-                    disabled={loading || (!user?.user_id && !getUserId()) || selectedIngredients.length === 0}
-                  >
-                    {loading ? 'Loading...' : 'Suggestions'}
-                  </button>
-                </div>
               </>
             )}
+            
+            {/* Suggestions Button - Always visible */}
+            <div className="get-suggestions-button-container">
+              <button
+                className="btn btn-primary btn-lg"
+                onClick={() => {
+                  console.log('Get Suggestions clicked', { 
+                    user_id: user?.user_id || getUserId(), 
+                    ingredients: selectedIngredients.length,
+                    loading 
+                  });
+                  loadRecommendations();
+                }}
+                disabled={loading || (!user?.user_id && !getUserId())}
+              >
+                {loading ? 'Loading...' : 'Suggestions'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1471,9 +1455,9 @@ const FoodSuggestions: React.FC = () => {
         )}
 
         {/* Empty State */}
-        {!loading && suggestions.length === 0 && selectedIngredients.length === 0 && (
+        {!loading && suggestions.length === 0 && selectedIngredients.length === 0 && !hasRequestedSuggestions && (
           <div className="empty-state">
-            <p>Add ingredients to get dish suggestions</p>
+            <p>Add ingredients to get personalized suggestions, or click "Suggestions" to see popular recipes</p>
           </div>
         )}
       </div>

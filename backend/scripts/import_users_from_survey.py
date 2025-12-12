@@ -6,7 +6,10 @@ Import survey data → create User nodes in Neo4j
 Link:
  - ALLERGIC_TO (handle 'No allergies')
  - FAVORS_CUISINE
- - INTERACTED_WITH Recipes (3 for DISH_MAP, 1 for DISH_MAP_EXTRA)
+ - INTERACTED_WITH Recipes:
+   * Fixed mappings: 1 recipe per dish (from DISH_TO_RECIPE_ID)
+   * Other dishes: 1 recipe per dish (fallback)
+   * Extra dishes: 1 recipe per dish
 """
 
 import argparse
@@ -18,6 +21,16 @@ from typing import Dict, List, Optional
 from neo4j import GraphDatabase
 
 import sys, os
+
+# Fix encoding for Windows console
+if sys.platform == "win32":
+    import io
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except AttributeError:
+        pass  # Already wrapped or not available
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config import DEFAULT_URI, DEFAULT_USER, DEFAULT_PASS, DEFAULT_DB
 
@@ -233,6 +246,52 @@ DISH_RULES_EXTRA = {
 }
 
 VN_TO_EN_CUISINE = { "Việt Nam": "Vietnamese", "Trung Quốc": "Chinese", "Ý": "Italian", "Nhật Bản": "Japanese", "Hàn Quốc": "Korean", "Pháp": "French", "Ấn Độ": "Indian", "Thái Lan": "Thai", "Mỹ": "American" }
+
+# ============================================================
+#  DISH TO RECIPE ID MAPPING (Fixed mappings)
+# ============================================================
+DISH_TO_RECIPE_ID: Dict[str, str] = {
+    # Vietnamese
+    "Pho": "rec_3644",
+    "Banh Mi": "rec_6011",
+    "Bun Cha": "rec_25733",
+    "Spring Rolls": "rec_39965",
+    "Banh Xeo": "rec_6015",
+    
+    # Thai
+    "Pad Thai": "rec_2021",
+    "Tom Yum": "rec_19350",
+    "Green Curry": "rec_2041",
+    "Som Tum": "rec_17535",
+    "Mango Sticky Rice": "rec_23301",
+    
+    # Chinese
+    "Dim Sum": "rec_12564",
+    "Peking Duck": "rec_27563",
+    "Mapo Tofu": "rec_8668",
+    "Kung Pao Chicken": "rec_21902",
+    "Chow Mein": "rec_9323",
+    
+    # French
+    "Croissant": "rec_11734",
+    "Baguette": "rec_15391",
+    "Creme Brulee": "rec_11831",
+    "Ratatouille": "rec_2063",
+    
+    # Japanese
+    "Sushi": "rec_19337",
+    "Ramen": "rec_24542",
+    "Tempura": "rec_7596",
+    "Okonomiyaki": "rec_25948",
+    "Udon": "rec_8346",
+    
+    # Korean
+    "Kimchi": "rec_21705",
+    "Bibimbap": "rec_4265",  # Using first one from list
+    "Tteokbokki": "rec_31922",
+    "Korean Fried Chicken": "rec_12134",
+}
+
 # ============================================================
 
 def _normalize_col(s: str) -> str:
@@ -394,10 +453,11 @@ def _norm_gender(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     v = value.lower()
-    if "nam" in v or "male" in v:
-        return "male"
+    # Check "female" FIRST to avoid matching "male" inside "female"
     if "nữ" in v or "female" in v:
         return "female"
+    if "nam" in v or "male" in v:
+        return "male"
     return "other"
 def _norm_age(value: Optional[str]) -> Optional[str]:
     """
@@ -434,6 +494,28 @@ def _norm_age(value: Optional[str]) -> Optional[str]:
 # ============================================================
 #  Recipe Query
 # ============================================================
+def _get_recipe_by_id(session, recipe_id: str) -> Optional[Dict]:
+    """
+    Lấy recipe theo recipe_id cụ thể
+    """
+    result = session.run("""
+        MATCH (r:Recipe {recipe_id: $rid})
+        RETURN r.recipe_id AS id, r.title AS title, 
+               coalesce(r.rating_value, 0.0) AS rating, 
+               toInteger(coalesce(r.rating_count, 0)) AS reviews,
+               5.0 AS score
+    """, rid=recipe_id).single()
+    
+    if result:
+        return {
+            "id": result["id"],
+            "title": result["title"],
+            "rating": result["rating"],
+            "reviews": result["reviews"],
+            "score": result["score"]
+        }
+    return None
+
 def _top_k_recipes_for_keyword(session, kw: str, k: int = 3, method: str = "hybrid",
                                C: float = None, m: int = None,
                                cuisine: str | None = None,
@@ -557,8 +639,13 @@ def pick_recipes(session, user_id: str, dish_name: str, C: float, m: int,
                  mode: str = "main", seen_global: set[str] | None = None,
                  allowed_cuisines: list[str] | None = None):
     """
-    mode = 'main'  -> dùng DISH_RULES + DISH_MAP, mỗi món k=3
+    mode = 'main'  -> dùng DISH_RULES + DISH_MAP
+      - Nếu có trong DISH_TO_RECIPE_ID: dùng recipe ID cụ thể (1 recipe)
+      - Nếu không: dùng keyword search (1 recipe)
+      - Tạo INTERACTED_WITH cho tất cả món khớp (không phân biệt cuisine)
     mode = 'extra' -> dùng DISH_RULES_EXTRA + DISH_MAP_EXTRA, mỗi món k=1
+      - Tạo INTERACTED_WITH cho tất cả món khớp (không phân biệt cuisine)
+    Note: allowed_cuisines parameter được giữ lại để tương thích nhưng không được sử dụng
     """
     dish_clean = _strip_accents(dish_name).strip()
     dish_tokens = set(dish_clean.split())
@@ -584,9 +671,8 @@ def pick_recipes(session, user_id: str, dish_name: str, C: float, m: int,
             if key in seen_keys or key in seen_global:
                 continue
 
-            # Nếu user có danh sách cuisine ưa thích, chỉ pick các món thuộc các cuisine đó
-            if allowed_cuisines and rule.get("cuisine") not in allowed_cuisines:
-                continue
+            # Bỏ qua kiểm tra cuisine - tạo INTERACTED_WITH cho tất cả món khớp
+            # (dù có đúng cuisine ưa thích hay không)
 
             for alias in DISH_MAP.get(key, []):
                 alias_norm = _strip_accents(alias).strip()
@@ -602,20 +688,34 @@ def pick_recipes(session, user_id: str, dish_name: str, C: float, m: int,
                     seen_keys.add(key)
                     seen_global.add(key)
 
-                    recipes = _top_k_recipes_for_keyword(
-                        session, key.lower(), k=3, C=C, m=m,
-                        cuisine=rule["cuisine"],
-                        must_have=rule.get("must_have"),
-                        must_not=rule.get("must_not")
-                    )
-                    if recipes:
-                        all_results.append((key, recipes))
-                        for r in recipes:
+                    # Kiểm tra xem có mapping cụ thể không
+                    if key in DISH_TO_RECIPE_ID:
+                        recipe_id = DISH_TO_RECIPE_ID[key]
+                        recipe = _get_recipe_by_id(session, recipe_id)
+                        if recipe:
+                            all_results.append((key, [recipe]))
                             session.run("""
                                 MATCH (u:User {user_id:$uid}), (rec:Recipe {recipe_id:$rid})
                                 MERGE (u)-[rel:INTERACTED_WITH]->(rec)
                                 ON CREATE SET rel.event_type='like', rel.timestamp=datetime()
-                            """, uid=user_id, rid=r["id"])
+                            """, uid=user_id, rid=recipe["id"])
+                    else:
+                        # Không có mapping cụ thể, dùng logic cũ nhưng chỉ lấy 1 recipe
+                        # Không filter theo cuisine - tạo INTERACTED_WITH cho tất cả món khớp
+                        recipes = _top_k_recipes_for_keyword(
+                            session, key.lower(), k=1, C=C, m=m,
+                            cuisine=None,  # Không filter theo cuisine
+                            must_have=rule.get("must_have"),
+                            must_not=rule.get("must_not")
+                        )
+                        if recipes:
+                            all_results.append((key, recipes))
+                            for r in recipes:
+                                session.run("""
+                                    MATCH (u:User {user_id:$uid}), (rec:Recipe {recipe_id:$rid})
+                                    MERGE (u)-[rel:INTERACTED_WITH]->(rec)
+                                    ON CREATE SET rel.event_type='like', rel.timestamp=datetime()
+                                """, uid=user_id, rid=r["id"])
                     break
         return all_results
 
@@ -648,9 +748,10 @@ def pick_recipes(session, user_id: str, dish_name: str, C: float, m: int,
                     seen_keys.add(key)
                     seen_global.add(key)
 
+                    # Không filter theo cuisine - tạo INTERACTED_WITH cho tất cả món khớp
                     recipes = _top_k_recipes_for_keyword(
                         session, key.lower(), k=1, C=C, m=m,
-                        cuisine=rule["cuisine"],
+                        cuisine=None,  # Không filter theo cuisine
                         must_have=rule.get("must_have"),
                         must_not=rule.get("must_not")
                     )
@@ -709,6 +810,19 @@ def import_survey(csv_path: str, uri: str, user: str, password: str, database: O
                     user_id = f"survey_{idx}"
 
                     # Xoá node User cũ (nếu có) cùng toàn bộ relationship để import lại từ survey
+                    # Ưu tiên tìm theo email (nếu trùng email thì xóa user cũ), nếu không có thì tìm theo user_id
+                    # Tìm và xóa user theo email trước
+                    session.run(
+                        """
+                        // Tìm user theo email trước (nếu trùng email thì xóa user cũ)
+                        MATCH (u:User)
+                        WHERE toLower(u.email) = toLower($email)
+                        DETACH DELETE u
+                        """,
+                        email=email,
+                    )
+                    
+                    # Nếu không tìm thấy theo email, thử tìm theo user_id (cho trường hợp user_id cũ)
                     session.run(
                         """
                         MATCH (u:User {user_id:$uid})
@@ -766,6 +880,19 @@ def import_survey(csv_path: str, uri: str, user: str, password: str, database: O
 
                     log_lines = [f"[{user_id}]"]
 
+                    # Xóa tất cả relationships cũ để cập nhật lại từ survey mới nhất
+                    session.run("""
+                        MATCH (u:User {user_id:$uid})
+                        OPTIONAL MATCH (u)-[rel1:ALLERGIC_TO]->()
+                        DELETE rel1
+                        WITH u
+                        OPTIONAL MATCH (u)-[rel2:FAVORS_CUISINE]->()
+                        DELETE rel2
+                        WITH u
+                        OPTIONAL MATCH (u)-[rel3:INTERACTED_WITH]->()
+                        DELETE rel3
+                    """, uid=user_id)
+
                     # --- Allergies ---
                     if allergy_cats:
                         if "none" in allergy_cats:
@@ -810,7 +937,9 @@ def import_survey(csv_path: str, uri: str, user: str, password: str, database: O
                             linked_fav_cuisines += 1
                         log_lines.append(f"FAVORS_CUISINE → {', '.join(fav_cuisines)}")
 
-  
+                    # Note: Diet nodes are created automatically during onboarding via PUT /users/{user_id}/diets endpoint
+                    # Not created here in survey import (similar to how Cuisine is handled in onboarding)
+
                     # --- Favorite dishes (MAIN + EXTRA) ---
                     dish_logs = []
                     picked_total = 0

@@ -1863,7 +1863,7 @@ def format_cypher_value(val: any) -> str:
     return escape_cypher_string(val)
 
 
-def generate_cypher_file(recipes: List[Dict], output_path: Path, verbose: bool = False, log_batch_size: int = 100) -> None:
+def generate_cypher_file(recipes: List[Dict], output_path: Path, verbose: bool = False, log_batch_size: int = 100, relationships_only: bool = False) -> None:
     """
     Generate Cypher import file with individual MERGE statements for compatibility with cypher-shell.
     
@@ -1890,7 +1890,6 @@ def generate_cypher_file(recipes: List[Dict], output_path: Path, verbose: bool =
                 print(f"[cypher] Progress: {idx}/{len(recipes)} recipes ({idx*100//len(recipes)}%) - {rate:.1f} recipes/sec - ETA: {eta:.0f}s")
             
             recipe_id = recipe["recipe_id"]
-            props = recipe["props"]
             ingredients = recipe.get("ingredients", [])
             
             # Escape function for Cypher strings
@@ -1909,44 +1908,47 @@ def generate_cypher_file(recipes: List[Dict], output_path: Path, verbose: bool =
                     return f'[{", ".join(items)}]'
                 return "null"
             
-            # Write MERGE statement for recipe
-            f.write(f"MERGE (r:Recipe {{recipe_id: {escape_str(recipe_id)}}})\n")
-            f.write(f"SET r.title = {escape_str(props.get('title'))},\n")
-            f.write(f"    r.description = {escape_str(props.get('description'))},\n")
-            f.write(f"    r.instructions = {escape_str(props.get('instructions'))},\n")
-            f.write(f"    r.ingredient = {escape_str(props.get('ingredient'))},\n")
-            f.write(f"    r.tags = {escape_str(props.get('tags'))},\n")
-            f.write(f"    r.prep_time_min = {escape_str(props.get('prep_time_min'))},\n")
-            f.write(f"    r.cook_time_min = {escape_str(props.get('cook_time_min'))},\n")
-            f.write(f"    r.total_time_min = {escape_str(props.get('total_time_min'))},\n")
-            f.write(f"    r.servings = {escape_str(props.get('servings'))},\n")
-            f.write(f"    r.cuisine = {escape_str(props.get('cuisine'))},\n")
-            f.write(f"    r.rating_value = {escape_str(props.get('rating_value'))},\n")
-            f.write(f"    r.nutrition_calories = {escape_str(props.get('nutrition_calories'))},\n")
-            f.write(f"    r.nutrition_protein = {escape_str(props.get('nutrition_protein'))},\n")
-            f.write(f"    r.nutrition_total_fat = {escape_str(props.get('nutrition_total_fat'))},\n")
-            f.write(f"    r.nutrition_saturated_fat = {escape_str(props.get('nutrition_saturated_fat'))},\n")
-            f.write(f"    r.nutrition_cholesterol = {escape_str(props.get('nutrition_cholesterol'))},\n")
-            f.write(f"    r.nutrition_sodium = {escape_str(props.get('nutrition_sodium'))},\n")
-            f.write(f"    r.nutrition_total_carbohydrate = {escape_str(props.get('nutrition_total_carbohydrate'))},\n")
-            f.write(f"    r.nutrition_dietary_fiber = {escape_str(props.get('nutrition_dietary_fiber'))},\n")
-            f.write(f"    r.nutrition_total_sugars = {escape_str(props.get('nutrition_total_sugars'))},\n")
-            f.write(f"    r.nutrition_vitamin_c = {escape_str(props.get('nutrition_vitamin_c'))},\n")
-            f.write(f"    r.nutrition_calcium = {escape_str(props.get('nutrition_calcium'))},\n")
-            f.write(f"    r.nutrition_iron = {escape_str(props.get('nutrition_iron'))},\n")
-            f.write(f"    r.nutrition_potassium = {escape_str(props.get('nutrition_potassium'))},\n")
-            # Legacy fields for backward compatibility
-            f.write(f"    r.nutrition_fat = {escape_str(props.get('nutrition_fat'))},\n")
-            f.write(f"    r.nutrition_carbohydrate = {escape_str(props.get('nutrition_carbohydrate'))},\n")
-            f.write(f"    r.nutrition_fiber = {escape_str(props.get('nutrition_fiber'))},\n")
-            f.write(f"    r.nutrition_sugar = {escape_str(props.get('nutrition_sugar'))};\n")
+            # Chỉ tạo relationships nếu relationships_only = True
+            if not relationships_only:
+                props = recipe["props"]
+                # Write MERGE statement for recipe
+                f.write(f"MERGE (r:Recipe {{recipe_id: {escape_str(recipe_id)}}})\n")
+                f.write(f"SET r.title = {escape_str(props.get('title'))},\n")
+                f.write(f"    r.description = {escape_str(props.get('description'))},\n")
+                f.write(f"    r.instructions = {escape_str(props.get('instructions'))},\n")
+                f.write(f"    r.ingredient = {escape_str(props.get('ingredient'))},\n")
+                f.write(f"    r.tags = {escape_str(props.get('tags'))},\n")
+                f.write(f"    r.prep_time_min = {escape_str(props.get('prep_time_min'))},\n")
+                f.write(f"    r.cook_time_min = {escape_str(props.get('cook_time_min'))},\n")
+                f.write(f"    r.total_time_min = {escape_str(props.get('total_time_min'))},\n")
+                f.write(f"    r.servings = {escape_str(props.get('servings'))},\n")
+                f.write(f"    r.cuisine = {escape_str(props.get('cuisine'))},\n")
+                f.write(f"    r.rating_value = {escape_str(props.get('rating_value'))},\n")
+                f.write(f"    r.nutrition_calories = {escape_str(props.get('nutrition_calories'))},\n")
+                f.write(f"    r.nutrition_protein = {escape_str(props.get('nutrition_protein'))},\n")
+                f.write(f"    r.nutrition_total_fat = {escape_str(props.get('nutrition_total_fat'))},\n")
+                f.write(f"    r.nutrition_saturated_fat = {escape_str(props.get('nutrition_saturated_fat'))},\n")
+                f.write(f"    r.nutrition_cholesterol = {escape_str(props.get('nutrition_cholesterol'))},\n")
+                f.write(f"    r.nutrition_sodium = {escape_str(props.get('nutrition_sodium'))},\n")
+                f.write(f"    r.nutrition_total_carbohydrate = {escape_str(props.get('nutrition_total_carbohydrate'))},\n")
+                f.write(f"    r.nutrition_dietary_fiber = {escape_str(props.get('nutrition_dietary_fiber'))},\n")
+                f.write(f"    r.nutrition_total_sugars = {escape_str(props.get('nutrition_total_sugars'))},\n")
+                f.write(f"    r.nutrition_vitamin_c = {escape_str(props.get('nutrition_vitamin_c'))},\n")
+                f.write(f"    r.nutrition_calcium = {escape_str(props.get('nutrition_calcium'))},\n")
+                f.write(f"    r.nutrition_iron = {escape_str(props.get('nutrition_iron'))},\n")
+                f.write(f"    r.nutrition_potassium = {escape_str(props.get('nutrition_potassium'))},\n")
+                # Legacy fields for backward compatibility
+                f.write(f"    r.nutrition_fat = {escape_str(props.get('nutrition_fat'))},\n")
+                f.write(f"    r.nutrition_carbohydrate = {escape_str(props.get('nutrition_carbohydrate'))},\n")
+                f.write(f"    r.nutrition_fiber = {escape_str(props.get('nutrition_fiber'))},\n")
+                f.write(f"    r.nutrition_sugar = {escape_str(props.get('nutrition_sugar'))};\n")
             
             # Write relationship statements for ingredients
             for ing in ingredients:
                 ing_id = ing.get("ingredient_id")
                 if ing_id:
                     f.write(f"MATCH (r:Recipe {{recipe_id: {escape_str(recipe_id)}}})\n")
-                    f.write(f"MATCH (i:CanonicalIngredient {{ingredient_id: {escape_str(ing_id)}}})\n")
+                    f.write(f"MATCH (i:Ingredient {{ingredient_id: {escape_str(ing_id)}}})\n")
                     f.write(f"MERGE (r)-[:HAS_INGREDIENT]->(i);\n")
             
             f.write("\n")
@@ -2032,6 +2034,25 @@ def build_cypher_batch(_: List[Dict]) -> str:
     return "\n".join(lines)
 
 
+def build_cypher_batch_relationships_only(_: List[Dict]) -> str:
+    """Construct Cypher query chỉ tạo HAS_INGREDIENT relationships, không tạo Recipe nodes."""
+    lines: List[str] = []
+    lines.append("UNWIND $rows AS row")
+    lines.append("// Chỉ tạo relationships, giả định Recipe đã tồn tại")
+    lines.append("MATCH (r:Recipe {recipe_id: row.recipe_id})")
+    lines.append("WITH r, row")
+    
+    # Ingredient relationships only
+    lines.append("CALL (r, row) {")
+    lines.append("  UNWIND coalesce(row.ingredients, []) AS ing")
+    lines.append("  MATCH (i:Ingredient {ingredient_id: ing.ingredient_id})")
+    lines.append("  MERGE (r)-[rel:HAS_INGREDIENT]->(i)")
+    lines.append("  RETURN count(*) AS _")
+    lines.append("}")
+    
+    return "\n".join(lines)
+
+
 # ==========================================
 # ⚙️ EXECUTION UTILITIES
 # ==========================================
@@ -2049,36 +2070,103 @@ def run_cypher_shell(cypher: str, neo4j_uri: str, user: str, password: str) -> N
         raise RuntimeError(f"cypher-shell error: {err}\nOutput: {out}")
 
 
-def run_via_driver(rows: List[Dict], *, uri: str, user: str, password: str, database: Optional[str]) -> None:
+def run_via_driver(rows: List[Dict], *, uri: str, user: str, password: str, database: Optional[str], relationships_only: bool = False) -> Tuple[int, int]:
     """
     Send batched queries using the official Neo4j Python driver (with retry).
     Pattern similar to import_canonical_ingredients.py for consistency.
+    Returns: (created_count, matched_count) tuple
     """
-    query = build_cypher_batch(rows)
-    driver = GraphDatabase.driver(uri, auth=(user, password))
-    session_kwargs = {"database": database} if database else {}
-    
-    for attempt in range(3):
-        try:
-            with driver.session(**session_kwargs) as session:
-                result = session.run(query, rows=rows)
-                result.consume()  # Consume result to ensure execution (like import_canonical_ingredients.py)
-            print(f"[neo4j] batch inserted successfully ({len(rows)} rows)")
-            break
-        except Exception as e:
-            if attempt < 2:  # Not last attempt
-                print(f"[retry] Neo4j error at batch ({attempt+1}/3): {e}")
-                import time
-                time.sleep(2)
-            else:  # Last attempt failed
-                print(f"[error] Neo4j error at batch (final attempt): {e}")
-                # Check if error is due to missing ingredients
-                error_str = str(e).lower()
-                if "ingredient" in error_str or "not found" in error_str or "null" in error_str:
-                    print(f"[warning] Some ingredients may not exist. Ensure ingredients are imported first using:")
-                    print(f"         python scripts/import_canonical_ingredients.py")
-                raise
-    driver.close()
+    if relationships_only:
+        query = build_cypher_batch_relationships_only(rows)
+        # For relationships_only mode, we can't track created vs matched
+        driver = GraphDatabase.driver(uri, auth=(user, password))
+        session_kwargs = {"database": database} if database else {}
+        
+        for attempt in range(3):
+            try:
+                with driver.session(**session_kwargs) as session:
+                    result = session.run(query, rows=rows)
+                    result.consume()
+                print(f"[neo4j] batch inserted successfully ({len(rows)} rows)")
+                driver.close()
+                return (0, 0)  # Can't track for relationships_only
+            except Exception as e:
+                if attempt < 2:
+                    print(f"[retry] Neo4j error at batch ({attempt+1}/3): {e}")
+                    import time
+                    time.sleep(2)
+                else:
+                    print(f"[error] Neo4j error at batch (final attempt): {e}")
+                    error_str = str(e).lower()
+                    if "ingredient" in error_str or "not found" in error_str or "null" in error_str:
+                        print(f"[warning] Some ingredients may not exist. Ensure ingredients are imported first using:")
+                        print(f"         python scripts/import_canonical_ingredients.py")
+                    driver.close()
+                    raise
+    else:
+        # For full import, track created vs matched
+        query = build_cypher_batch(rows)
+        # Add a query to count created vs matched recipes
+        # Use exists() to check if property exists, and coalesce to handle null
+        stats_query = """
+        UNWIND $recipe_ids AS rid
+        MATCH (r:Recipe {recipe_id: rid})
+        RETURN 
+            sum(CASE WHEN exists(r._created) AND r._created = true THEN 1 ELSE 0 END) AS created_count,
+            sum(CASE WHEN exists(r._matched) AND r._matched = true THEN 1 ELSE 0 END) AS matched_count
+        """
+        recipe_ids = [row["recipe_id"] for row in rows]
+        
+        driver = GraphDatabase.driver(uri, auth=(user, password))
+        session_kwargs = {"database": database} if database else {}
+        
+        for attempt in range(3):
+            try:
+                with driver.session(**session_kwargs) as session:
+                    # First, check which recipes already exist (before MERGE)
+                    check_existing_query = """
+                    UNWIND $recipe_ids AS rid
+                    OPTIONAL MATCH (r:Recipe {recipe_id: rid})
+                    RETURN rid, r IS NOT NULL AS exists
+                    """
+                    existing_result = session.run(check_existing_query, recipe_ids=recipe_ids)
+                    existing_map = {record["rid"]: record["exists"] for record in existing_result}
+                    
+                    # Execute main import query
+                    result = session.run(query, rows=rows)
+                    result.consume()
+                    
+                    # Count: if recipe existed before MERGE, it's matched; otherwise created
+                    created_count = sum(1 for rid in recipe_ids if not existing_map.get(rid, False))
+                    matched_count = sum(1 for rid in recipe_ids if existing_map.get(rid, False))
+                    
+                    # Clean up temporary properties (if any were set)
+                    cleanup_query = """
+                    UNWIND $recipe_ids AS rid
+                    MATCH (r:Recipe {recipe_id: rid})
+                    REMOVE r._created, r._matched
+                    """
+                    try:
+                        session.run(cleanup_query, recipe_ids=recipe_ids).consume()
+                    except Exception:
+                        pass  # Ignore if properties don't exist
+                    
+                print(f"[neo4j] batch processed: {created_count} created, {matched_count} matched (total: {len(rows)} rows)")
+                driver.close()
+                return (created_count, matched_count)
+            except Exception as e:
+                if attempt < 2:
+                    print(f"[retry] Neo4j error at batch ({attempt+1}/3): {e}")
+                    import time
+                    time.sleep(2)
+                else:
+                    print(f"[error] Neo4j error at batch (final attempt): {e}")
+                    error_str = str(e).lower()
+                    if "ingredient" in error_str or "not found" in error_str or "null" in error_str:
+                        print(f"[warning] Some ingredients may not exist. Ensure ingredients are imported first using:")
+                        print(f"         python scripts/import_canonical_ingredients.py")
+                    driver.close()
+                    raise
 
 
 
@@ -2101,7 +2189,8 @@ def main() -> None:
     parser.add_argument("--use-driver", action="store_true", help="Use Neo4j Python driver for import (recommended)")
     parser.add_argument("--batch-size", type=int, default=3000, help="Number of recipes per batch (default: 3000, optimized for performance)")
     parser.add_argument("--dry-run", action="store_true", help="Print Cypher only, do not execute")
-    parser.add_argument("--out-cypher", type=str, default=None, help="Optional: Generate Cypher file instead of direct import")
+    parser.add_argument("--out-cypher", type=str, default=None, help="Optional: Generate Cypher file (can be combined with --use-driver to both import and save Cypher)")
+    parser.add_argument("--relationships-only", action="store_true", help="Chỉ tạo HAS_INGREDIENT relationships, không tạo Recipe nodes (dùng với --out-cypher hoặc --use-driver)")
     parser.add_argument("--cypher-log-batch-size", type=int, default=100, help="Log progress every N recipes when generating Cypher file (default: 100)")
     parser.add_argument("--limit", type=int, default=None, help="Process only the first N rows")
     parser.add_argument("--verbose", action="store_true", help="Print debug logs while processing")
@@ -2142,6 +2231,10 @@ def main() -> None:
     batch_rows: List[Dict] = []
     cypher_batches: List[str] = []
     all_recipes: List[Dict] = []  # Collect all recipes if generating Cypher file
+    
+    # Track created vs matched recipes
+    total_created = 0
+    total_matched = 0
     
     # Performance tracking for speed logging
     start_time = time.time()
@@ -2504,13 +2597,18 @@ def main() -> None:
                         TOKEN_MAP_CACHE[cache_key] = ing_id
                 semantic_batch_tokens.clear()
 
-            # Batch flush (skip if generating Cypher file)
-            if not args.out_cypher and len(batch_rows) >= args.batch_size:
-                print(f"[batch] importing up to row #{idx} (size={len(batch_rows)})")
+            # Batch flush (import nếu có --use-driver, vẫn collect cho Cypher file nếu có --out-cypher)
+            if len(batch_rows) >= args.batch_size:
+                # Import vào database nếu có --use-driver (không skip nếu có --out-cypher)
                 if args.use_driver and not args.dry_run:
-                    run_via_driver(batch_rows, uri=args.uri, user=args.user, password=args.password, database=args.database)
-
-                else:
+                    print(f"[batch] importing up to row #{idx} (size={len(batch_rows)})")
+                    if args.relationships_only:
+                        print("[*] Chế độ: Chỉ tạo HAS_INGREDIENT relationships (không tạo Recipe nodes)")
+                    created, matched = run_via_driver(batch_rows, uri=args.uri, user=args.user, password=args.password, database=args.database, relationships_only=args.relationships_only)
+                    total_created += created
+                    total_matched += matched
+                elif not args.out_cypher:  # Chỉ dùng cypher-shell nếu không có --out-cypher
+                    print(f"[batch] importing up to row #{idx} (size={len(batch_rows)})")
                     cypher = build_cypher_batch([])
                     param_json = json.dumps({"rows": batch_rows})
                     full = f":param rows => {param_json};\n{cypher}"
@@ -2518,6 +2616,7 @@ def main() -> None:
                     if not args.dry_run:
                         run_cypher_shell(full, args.uri, args.user, args.password)
 
+                # Clear batch sau khi import (đã collect vào all_recipes nếu có --out-cypher ở line 2479-2480)
                 batch_rows = []
 
         except Exception as e:
@@ -2546,22 +2645,31 @@ def main() -> None:
                 TOKEN_MAP_CACHE[cache_key] = ing_id
         semantic_batch_tokens.clear()
 
-    # Generate Cypher file if requested
+    # Final leftover batch - import vào database nếu có --use-driver
+    if batch_rows:
+        if args.use_driver and not args.dry_run:
+            print(f"[batch] importing final batch (size={len(batch_rows)})")
+            if args.relationships_only:
+                print("[*] Chế độ: Chỉ tạo HAS_INGREDIENT relationships (không tạo Recipe nodes)")
+            created, matched = run_via_driver(batch_rows, uri=args.uri, user=args.user, password=args.password, database=args.database, relationships_only=args.relationships_only)
+            total_created += created
+            total_matched += matched
+        elif not args.out_cypher:  # Chỉ dùng cypher-shell nếu không có --out-cypher
+            print(f"[batch] importing final batch (size={len(batch_rows)})")
+            cypher = build_cypher_batch([])
+            param_json = json.dumps({"rows": batch_rows})
+            full = f":param rows => {param_json};\n{cypher}"
+            cypher_batches.append(full)
+            if not args.dry_run:
+                run_cypher_shell(full, args.uri, args.user, args.password)
+
+    # Generate Cypher file if requested (sau khi đã import xong)
     if args.out_cypher:
         output_path = Path(args.out_cypher)
-        generate_cypher_file(all_recipes, output_path, args.verbose, log_batch_size=args.cypher_log_batch_size)
-    else:
-        # Final leftover batch (only if not generating Cypher file)
-        if batch_rows:
-            if args.use_driver and not args.dry_run:
-                run_via_driver(batch_rows, uri=args.uri, user=args.user, password=args.password, database=args.database)
-            else:
-                cypher = build_cypher_batch([])
-                param_json = json.dumps({"rows": batch_rows})
-                full = f":param rows => {param_json};\n{cypher}"
-                cypher_batches.append(full)
-                if not args.dry_run:
-                    run_cypher_shell(full, args.uri, args.user, args.password)
+        if args.relationships_only:
+            print("[*] Chế độ: Chỉ tạo HAS_INGREDIENT relationships (không tạo Recipe nodes)")
+        print(f"[cypher] Generating Cypher file with {len(all_recipes)} recipes...")
+        generate_cypher_file(all_recipes, output_path, args.verbose, log_batch_size=args.cypher_log_batch_size, relationships_only=args.relationships_only)
 
         # Preview file nếu dry-run
         if args.dry_run:
@@ -2574,6 +2682,9 @@ def main() -> None:
     total_time = time.time() - start_time
     avg_speed = idx / total_time if total_time > 0 else 0
     print(f"[OK] Import completed! Processed {idx} rows in {total_time:.1f}s ({avg_speed:.1f} rows/sec)")
+    if args.use_driver and not args.relationships_only:
+        print(f"     📊 Statistics: {total_created} recipes created (new), {total_matched} recipes matched (already existed)")
+        print(f"     ℹ️  Total recipes in database: {total_created + total_matched} processed")
 
 
 if __name__ == "__main__":

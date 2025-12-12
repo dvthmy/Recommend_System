@@ -35,6 +35,12 @@
   color: var(--color-primary);
 }
 
+.logo-image {
+  height: 100px;
+  width: auto;
+  object-fit: contain;
+}
+
 .nav-menu {
   display: flex;
   align-items: center;
@@ -84,7 +90,7 @@
 
 .nav-link.active {
   color: var(--color-primary);
-  background-color: rgba(255, 107, 53, 0.1);
+  background-color: rgba(226, 125, 96, 0.1);
 }
 
 .nav-icon {
@@ -121,7 +127,7 @@
   width: 40px;
   height: 40px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-primary) 0%, #ff8c42 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
   text-decoration: none;
   color: white;
   font-size: var(--text-lg);
@@ -153,7 +159,7 @@
 .user-avatar:hover {
   transform: scale(1.1);
   border-color: var(--color-primary);
-  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 2px 8px rgba(226, 125, 96, 0.3);
 }
 
 .mobile-menu-toggle {

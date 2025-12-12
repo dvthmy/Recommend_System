@@ -22,7 +22,8 @@ const Navigation: React.FC<NavigationProps> = ({ isLoggedIn: propIsLoggedIn }: N
 
   const navigationItems = [
     { path: '/', label: 'Home' },
-    { path: '/onboarding', label: 'Suggestions' },
+    { path: '/onboarding', label: 'Onboarding' },
+    { path: '/suggestions', label: 'Suggestions' },
     { path: '/history', label: 'History' },
   ];
 
@@ -38,7 +39,7 @@ const Navigation: React.FC<NavigationProps> = ({ isLoggedIn: propIsLoggedIn }: N
         <div className="nav-content">
           {/* Logo */}
           <Link to="/" className="nav-logo">
-            <span className="logo-text">FoodAI</span>
+            <img src="/logo.png" alt="FoodAI Logo" className="logo-image" />
           </Link>
 
           {/* Desktop Navigation */}

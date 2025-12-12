@@ -129,9 +129,9 @@
   height: 100%;
   padding: 0 var(--spacing-xl);
   font-size: var(--text-base);
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-light);
   border-radius: 12px;
-  background-color: #fafafa;
+  background-color: var(--bg-secondary);
   color: var(--text-primary);
   transition: all 0.2s ease;
 }
@@ -139,7 +139,7 @@
 .hero-search-input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+  box-shadow: 0 0 0 3px rgba(226, 125, 96, 0.1);
 }
 
 .hero-search-input::placeholder {
@@ -150,14 +150,14 @@
   width: 100%;
   height: 52px;
   min-height: 48px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-light);
   border-radius: 12px;
   padding: 14px 48px 14px 18px;
   padding-right: 40px;
   font-size: 16px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  color: #212121;
-  background-color: #fafafa;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath stroke='%239e9e9e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none' d='M2 4L6 8L10 4'/%3E%3C/svg%3E");
   background-position: right 18px center; 
@@ -167,7 +167,7 @@
 
 /* Hover */
 .cuisine-select:hover {
-  border-color: #bdbdbd;
+  border-color: var(--border-medium);
 }
 
 /* Focus (khi click vào) */
@@ -185,12 +185,12 @@
   width: 100%;
   padding: 14px 48px 14px 18px;
   padding-right: 40px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-light);
   border-radius: 12px;
   font-size: 16px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  color: #212121;
-  background-color: #fafafa;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
   transition: all 0.2s ease;
   min-height: 48px;
   height: 52px;
@@ -204,7 +204,7 @@
 }
 
 .hero-cuisine-dropdown .custom-dropdown-select:hover {
-  border-color: #bdbdbd;
+  border-color: var(--border-medium);
 }
 
 .hero-cuisine-dropdown .custom-dropdown-value {
@@ -215,7 +215,7 @@
 }
 
 .hero-cuisine-dropdown .custom-dropdown-value.placeholder {
-  color: #999;
+  color: var(--text-disabled);
 }
 
 .hero-cuisine-dropdown .custom-dropdown-arrow {
@@ -235,8 +235,8 @@
   top: 100%;
   left: 0;
   right: 0;
-  background-color: #ffffff;
-  border: 1px solid #f0f0f0;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-light);
   border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
   margin-top: 4px;
@@ -248,7 +248,7 @@
 .hero-cuisine-dropdown .custom-dropdown-item {
   padding: 12px 16px;
   cursor: pointer;
-  color: #212121;
+  color: var(--text-primary);
   font-size: 16px;
   display: flex;
   align-items: center;
@@ -270,7 +270,7 @@
 
 .hero-cuisine-dropdown .custom-dropdown-item.selected {
   background-color: #e8f5e9;
-  color: #212121;
+  color: var(--text-primary);
 }
 
 .hero-cuisine-dropdown .custom-dropdown-item.selected svg {
@@ -523,7 +523,7 @@
 }
 
 .viewed-badge {
-  background-color: #f0f0f0;
+  background-color: var(--bg-tertiary);
   color: var(--text-secondary);
   padding: 2px 8px;
   border-radius: 12px;

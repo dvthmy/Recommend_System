@@ -5,14 +5,16 @@
   line-height: 1.5;
   font-weight: 400;
   
-  /* Design System Colors */
-  --color-primary: #ff6b35;
-  --color-primary-light: #ff8c5a;
-  --color-primary-dark: #e55a2b;
-  --color-secondary: #4caf50;
-  --color-secondary-light: #66bb6a;
-  --color-accent: #ffeb3b;
-  --color-accent-light: #fff176;
+  /* Design System Colors - Based on provided palette */
+  --color-primary: #E27D60; /* Orange-red */
+  --color-primary-light: #E8A87C; /* Light orange/peach */
+  --color-primary-dark: #C85D42; /* Darker orange-red */
+  --color-secondary: #41B3A3; /* Teal/seafoam green */
+  --color-secondary-light: #5FC4B5; /* Lighter teal */
+  --color-accent: #85DCB0; /* Light blue/cyan */
+  --color-accent-light: #A5E6C8; /* Lighter cyan */
+  --color-tertiary: #C38D9E; /* Muted purple/mauve */
+  --color-tertiary-light: #D4A5B3; /* Lighter purple */
   
   /* Neutral Colors */
   --color-white: #ffffff;
@@ -27,11 +29,11 @@
   --color-gray-800: #424242;
   --color-gray-900: #212121;
   
-  /* Semantic Colors */
-  --color-success: #4caf50;
-  --color-warning: #ff9800;
-  --color-error: #f44336;
-  --color-info: #2196f3;
+  /* Semantic Colors - Based on provided palette */
+  --color-success: #41B3A3; /* Teal/seafoam green */
+  --color-warning: #E8A87C; /* Light orange/peach */
+  --color-error: #E27D60; /* Orange-red */
+  --color-info: #85DCB0; /* Light blue/cyan */
   
   /* Text Colors */
   --text-primary: #212121;
@@ -296,7 +298,7 @@ img {
 .form-input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+  box-shadow: 0 0 0 3px rgba(226, 125, 96, 0.1);
 }
 
 .form-input::placeholder {

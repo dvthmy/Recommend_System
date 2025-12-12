@@ -13,10 +13,10 @@ import math
 from recommend_graph import GraphHybridRecommender
 
 # ===== Neo4j config =====
-URI = "bolt://localhost:7687"
+URI = "neo4j+s://3b0d8961.databases.neo4j.io"
 USER = "neo4j"
-PASSWORD = "Admin123!"
-DATABASE = "test"
+PASSWORD = "qV5l-Ck8vasO5qoM65gjWhuJTa2HBr4e6KwSYJ0RfT0"
+DATABASE = "neo4j"
 
 K = 10
 TOP_ING = 5

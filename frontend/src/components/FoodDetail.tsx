@@ -63,6 +63,14 @@ const FoodDetail: React.FC = () => {
                 recipe_id: recipeId,
                 event_type: 'view'
               });
+              
+              // Dispatch event to notify Profile component to reload stats
+              // Use a small delay to avoid too frequent updates
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('interactionUpdated', { 
+                  detail: { type: 'view', recipeId } 
+                }));
+              }, 500);
             } catch (err) {
               console.error('Failed to record view interaction:', err);
             }
@@ -170,17 +178,52 @@ const FoodDetail: React.FC = () => {
   } : null;
 
   // Get instructions from recipe or use default
-  const instructions = recipe?.instructions
-    ? recipe.instructions
+  let instructions: string[] = [];
+  if (recipe?.instructions) {
+    const raw = recipe.instructions as any;
+
+    if (Array.isArray(raw)) {
+      // Backend provides instructions as an array of strings
+      instructions = raw
+        .map((step: any) => (typeof step === 'string' ? step.trim() : String(step).trim()))
+        .filter((step: string) => step.length > 0);
+    } else if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+
+      // Case 1: instructions is a JSON array stored as string: '["1)...","2)..."]'
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            instructions = parsed
+              .map((step: any) => (typeof step === 'string' ? step.trim() : String(step).trim()))
+              .filter((step: string) => step.length > 0);
+          }
+        } catch {
+          // Fallback: treat as plain string if JSON.parse fails
+          instructions = trimmed
+            .split(/\||\n/)
+            .map(step => step.trim())
+            .filter(step => step.length > 0);
+        }
+      } else {
+        // Case 2: plain string with separators
+        instructions = trimmed
         .split(/\||\n/)
         .map(step => step.trim())
-        .filter(step => step.length > 0)
-    : [
+          .filter(step => step.length > 0);
+      }
+    }
+  }
+
+  if (instructions.length === 0) {
+    instructions = [
         'Prepare ingredients as listed above.',
         'Follow the cooking instructions for your chosen recipe.',
         'Cook according to the specified time and temperature.',
         'Season to taste and serve hot.'
       ];
+  }
 
   const handleRate = async (rating: number) => {
     if (isGuestUser()) {
@@ -203,6 +246,11 @@ const FoodDetail: React.FC = () => {
         
         // Reload recipe to get updated average rating and count
         await loadRecipeDetail(id!, false);
+        
+        // Dispatch event to notify Profile component to reload stats
+        window.dispatchEvent(new CustomEvent('interactionUpdated', { 
+          detail: { type: 'rating', recipeId: recipe.recipe_id, rating } 
+        }));
       } catch (err) {
         console.error('❌ Failed to rate recipe:', err);
         alert('❌ Failed to submit rating. Please try again.');
@@ -224,6 +272,11 @@ const FoodDetail: React.FC = () => {
         
         // Reload recipe to get updated average rating and count
         await loadRecipeDetail(id!, false);
+        
+        // Dispatch event to notify Profile component to reload stats
+        window.dispatchEvent(new CustomEvent('interactionUpdated', { 
+          detail: { type: 'rating', recipeId: recipe.recipe_id, rating: 0 } 
+        }));
       } catch (err: any) {
         console.error('❌ Failed to remove rating:', err);
         
@@ -298,6 +351,11 @@ const FoodDetail: React.FC = () => {
         event_type: 'like'
       });
       // Success - state already updated optimistically
+      
+      // Dispatch event to notify Profile component to reload stats
+      window.dispatchEvent(new CustomEvent('interactionUpdated', { 
+        detail: { type: 'like', recipeId, isLiked: newLikedState } 
+      }));
     } catch (err) {
       console.error('Failed to toggle like:', err);
       setIsLiked(!newLikedState); // Revert on error

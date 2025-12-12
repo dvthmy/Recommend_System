@@ -146,7 +146,7 @@
 }
 
 .edit-input:focus {
-  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+  box-shadow: 0 0 0 2px rgba(226, 125, 96, 0.2);
 }
 
 .ingredient-actions {
@@ -173,7 +173,7 @@
 }
 
 .action-btn.edit:hover {
-  background-color: #1976d2;
+  background-color: var(--color-info);
   transform: scale(1.1);
 }
 
@@ -183,7 +183,7 @@
 }
 
 .action-btn.remove:hover {
-  background-color: #d32f2f;
+  background-color: var(--color-error);
   transform: scale(1.1);
 }
 
@@ -193,7 +193,7 @@
 }
 
 .action-btn.save:hover {
-  background-color: #388e3c;
+  background-color: var(--color-success);
   transform: scale(1.1);
 }
 

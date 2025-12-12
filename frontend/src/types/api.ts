@@ -260,6 +260,7 @@ export interface InteractionStats {
   like_count: number;
   save_count: number;
   view_count: number;
+  rating_count: number;
   average_rating?: number;
   most_recent_interaction?: string;
 }

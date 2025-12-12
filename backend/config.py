@@ -1,7 +1,15 @@
+# Neo4j Configuration - Default for scripts
+# Neo4j Desktop Local (khuyến nghị cho development)
 DEFAULT_URI = "bolt://localhost:7687"
 DEFAULT_USER = "neo4j"
 DEFAULT_PASS = "Admin123!"
-DEFAULT_DB   = "test"
+DEFAULT_DB   = "neo4j"
+
+# Neo4j Aura Cloud (backup - comment out nếu dùng local)
+# DEFAULT_URI = "neo4j+s://3b0d8961.databases.neo4j.io"
+# DEFAULT_USER = "neo4j"
+# DEFAULT_PASS = "qV5l-Ck8vasO5qoM65gjWhuJTa2HBr4e6KwSYJ0RfT0"
+# DEFAULT_DB   = "neo4j"
 DEFAULT_BATCH = 5000
 TOP_TERMS_PER_RECIPE = 512
 NON_ING_WORDS = {

@@ -41,7 +41,7 @@
 }
 
 .auth-tab.active {
-  color: #8b5a3c;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -52,7 +52,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #8b5a3c;
+  background: var(--color-primary);
 }
 
 .auth-form-container {
@@ -108,8 +108,8 @@
 
 .form-group input:focus {
   outline: none;
-  border-color: #8b5a3c;
-  box-shadow: 0 0 0 3px rgba(139, 90, 60, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(226, 125, 96, 0.1);
 }
 
 .form-group input::placeholder {
@@ -332,14 +332,14 @@
 }
 
 .btn-primary {
-  background: #8b5a3c;
+  background: var(--color-primary);
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #6d4329;
+  background: var(--color-primary-dark);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(139, 90, 60, 0.3);
+  box-shadow: 0 4px 12px rgba(226, 125, 96, 0.3);
 }
 
 .btn-primary:disabled {
@@ -349,12 +349,12 @@
 
 .btn-outline {
   background: transparent;
-  color: #8b5a3c;
-  border: 2px solid #8b5a3c;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
 }
 
 .btn-outline:hover {
-  background: #8b5a3c;
+  background: var(--color-primary);
   color: white;
 }
 
